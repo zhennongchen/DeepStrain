@@ -117,11 +117,13 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
         UpSampling  = UpSampling3D
         strides     = (2,2,1)
         kernel_size = (3,3,1)
+        print('in network, we use 3D')
     elif len(x.shape) == 4:
         Conv        = Conv2D
         UpSampling  = UpSampling2D
         strides     = (2,2)
         kernel_size = (3,3)
+        print('in network, we use 3D')
             
     d1 = encoder(Conv, x,  gf*1, strides=strides, kernel_size=kernel_size)
     d2 = encoder(Conv, d1, gf*2, strides=strides, kernel_size=kernel_size)
@@ -141,7 +143,7 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
     u7 = UpSampling(size=strides)(u6)
     u7 = Conv(nchannels, kernel_size=kernel_size, strides=1, padding='same', activation=map_activation)(u7)    
     
-    return u7
+    return u7 
 
 class CarSON():
     """Cardiac Segmentation Network."""
@@ -189,6 +191,7 @@ class CarMEN():
         V_0 = keras.Input(shape=self.opt.volume_shape) 
         V_t = keras.Input(shape=self.opt.volume_shape)
         V   = keras.layers.Concatenate(axis=-1)([V_0, V_t])
+        print('Vshape in network: ,', V.shape)
 
         u = encoder_decoder(V, nchannels=3, map_activation=None)
                        
