@@ -10,6 +10,7 @@ from scipy.interpolate import RegularGridInterpolator
 from nibabel.affines import apply_affine
 import re
 import cv2 
+from skimage.measure import label, regionprops
 
 # function: normalize the CMR image
 def normalize_image(x, axis=(0,1,2)):
@@ -351,13 +352,31 @@ def make_movies(save_path,pngs,fps):
     out.release()
 
 
-# # function: same sign (all negative or positive)
-# def same_sign(x):
-#     x = np.asarray(x).reshape(-1)
-#     signs = x >= 0
-#     if sum(signs) == 0 or sum(signs) == x.shape[0]:
-#         return 1
-#     else:
-#         return 0
+# function: remove scattered regions in a binary image
+def remove_scatter(img,target_label):
+    new_img = np.copy(img)
+    new_img[new_img == target_label] = 100
+    for i in range(0,img.shape[2]):
+        a = img[:,:,i]
+        # check if there's label 1 in this slice
+        if np.sum(a==target_label) == 0:
+            continue
+        labeled_image = label(a == target_label)
+        regions = regionprops(labeled_image)
+        region_sizes = [region.area for region in regions]
 
+        # Step 3: Find Largest Region Label
+        largest_region_label = np.argmax(region_sizes) + 1  # Adding 1 because labels start from 1
+
+        # Step 4: Create Mask for Largest Region
+        largest_region_mask = (labeled_image == largest_region_label)
+
+        # Step 5: Apply Mask to Original Image
+        result_image = a.copy()
+        result_image[~largest_region_mask] = 0
+        new_slice = new_img[:,:,i]
+        new_slice[result_image==target_label] = target_label
+        new_slice[new_slice == 100] = 0
+        new_img[:,:,i] = new_slice
+    return new_img
     
