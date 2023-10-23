@@ -2,6 +2,7 @@
 # Harvard-MIT Department of Health Sciences & Technology  
 # Athinoula A. Martinos Center for Biomedical Imaging
 
+import tensorflow as tf
 from tensorflow import keras 
 from tensorflow.keras.layers import PReLU, BatchNormalization, UpSampling2D, UpSampling3D, Conv2D, Conv3D, Add, Concatenate
 from .dense_image_warp import dense_image_warp3d as warp
@@ -123,7 +124,7 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
         UpSampling  = UpSampling2D
         strides     = (2,2)
         kernel_size = (3,3)
-        print('in network, we use 3D')
+        print('in network, we use 2D')
             
     d1 = encoder(Conv, x,  gf*1, strides=strides, kernel_size=kernel_size)
     d2 = encoder(Conv, d1, gf*2, strides=strides, kernel_size=kernel_size)
@@ -142,6 +143,7 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
 
     u7 = UpSampling(size=strides)(u6)
     u7 = Conv(nchannels, kernel_size=kernel_size, strides=1, padding='same', activation=map_activation)(u7)    
+    print('u7 shape: ', u7.shape)
     
     return u7 
 
@@ -187,11 +189,11 @@ class CarMEN():
             model.compile(loss=self.opt.criterion_netME, 
                           loss_weights=loss_weights, 
                           optimizer=self.optimizer(learning_rate=self.opt.netME_lr))
+            
     def get_model(self):    
         V_0 = keras.Input(shape=self.opt.volume_shape) 
         V_t = keras.Input(shape=self.opt.volume_shape)
         V   = keras.layers.Concatenate(axis=-1)([V_0, V_t])
-        print('Vshape in network: ,', V.shape)
 
         u = encoder_decoder(V, nchannels=3, map_activation=None)
                        
