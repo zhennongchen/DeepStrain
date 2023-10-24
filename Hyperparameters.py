@@ -21,8 +21,8 @@ def learning_rate_step_decay_classic(epoch, lr, decay = cg.decay_rate, initial_p
 
 
 def dice_loss_selected_class(y_true, y_pred):
-    y_true_selected = y_true[...,[0,2,3]]
-    y_pred_selected = y_pred[...,[0,2,3]]
+    y_true_selected = tf.gather(y_true, [0, 2, 3], axis=-1)
+    y_pred_selected =tf.gather(y_pred, [0, 2, 3], axis=-1)
 
     intersection = tf.reduce_sum(y_true_selected * y_pred_selected)
     union = tf.reduce_sum(y_true_selected) + tf.reduce_sum(y_pred_selected)

@@ -143,7 +143,6 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
 
     u7 = UpSampling(size=strides)(u6)
     u7 = Conv(nchannels, kernel_size=kernel_size, strides=1, padding='same', activation=map_activation)(u7)    
-    print('u7 shape: ', u7.shape)
     
     return u7 
 
