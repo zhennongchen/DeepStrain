@@ -15,6 +15,8 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Concatenate
 from tensorflow.keras.callbacks import Callback
+from tensorflow.keras import backend as K
+from tensorflow.keras.activations import softmax
 
 import DeepStrain.functions_collection as ff
 import DeepStrain.models.networks as network
@@ -22,6 +24,7 @@ import DeepStrain.Defaults as Defaults
 import DeepStrain.Hyperparameters as hyper
 import DeepStrain.Build_list.Build_list as Build_list
 import DeepStrain.Generator_seg as Generator_seg
+from DeepStrain.models.dense_image_warp import dense_image_warp3d as warp
 
 cg = Defaults.Parameters()
 
@@ -42,10 +45,18 @@ print(img_file_trn[0:5], seg_file_trn[0:5], pred_seg_file_trn[0:5])
 # create model
 V_0_input = Input(shape = [128,128,16,1]) 
 V_t_input = Input(shape = [128,128,16,1]) 
+M_0_input = Input(shape = [128,128,16,3])
+M_t_input = Input(shape = [128,128,16,3])
+M_t_split = tf.split(M_t_input, M_t_input.shape[-1], -1)
+
 input   = Concatenate(axis=-1)([V_0_input, V_t_input])
 motion_estimates = network.encoder_decoder(input, nchannels=3, map_activation=None)
+V_0_pred = warp(V_t_input, motion_estimates)
+M_0_pred  = K.concatenate([warp(K.cast(mt, K.dtype(V_t_input)), motion_estimates) for mt in M_t_split], -1)    
+M_0_pred  = softmax(M_0_pred) 
+print('shape: ', V_0_pred.shape, M_0_pred.shape)
 
-model = Model(inputs = [V_0_input, V_t_input], outputs = [motion_estimates])
+model = Model(inputs = [V_0_input, V_t_input, M_0_input, M_t_input], outputs = [motion_estimates,V_0_pred, M_0_pred])
 
 model_file =  os.path.join(cg.deep_dir,'models/trained/carmen_Jan2021.h5')
 model.load_weights(model_file)
