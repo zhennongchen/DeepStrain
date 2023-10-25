@@ -14,6 +14,7 @@ from tensorflow.keras.callbacks import ModelCheckpoint, LearningRateScheduler, C
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input
+from tensorflow.keras.callbacks import Callback
 
 import DeepStrain.functions_collection as ff
 import DeepStrain.models.networks as network
@@ -23,6 +24,7 @@ import DeepStrain.Build_list.Build_list as Build_list
 import DeepStrain.Generator_seg as Generator_seg
 
 cg = Defaults.Parameters()
+
 
 trial_name = 'fine_tune_carson'
 val_batch = 9
@@ -36,10 +38,18 @@ b = Build_list.Build(data_sheet)
 _,_,_,_,_,_, img_file_trn, seg_file_trn, pred_seg_file_trn,_ = b.__build__(batch_list = train_batch)
 _,_,_,_,_,_, img_file_val, seg_file_val, pred_seg_file_val,_= b.__build__(batch_list = [val_batch])
 
-n = np.arange(0,2,1)
-img_file_trn = img_file_trn[n]; seg_file_trn = seg_file_trn[n]; pred_seg_file_trn = pred_seg_file_trn[n]
-n = np.arange(0,1,1)
-img_file_val = img_file_val[n]; seg_file_val = seg_file_val[n]; pred_seg_file_val = pred_seg_file_val[n]
+# n = np.arange(49,50,1)
+# img_file_trn = img_file_trn[n]; seg_file_trn = seg_file_trn[n]; pred_seg_file_trn = pred_seg_file_trn[n]
+# n = np.arange(0,1,1)
+# img_file_val = img_file_val[n]; seg_file_val = seg_file_val[n]; pred_seg_file_val = pred_seg_file_val[n]
+img_file_trn = np.tile(img_file_trn, 10)
+seg_file_trn = np.tile(seg_file_trn, 10)
+pred_seg_file_trn = np.tile(pred_seg_file_trn, 10)
+
+print('img_file_trn.shape: ', img_file_trn.shape, 'seg_file_trn.shape: ', seg_file_trn.shape, 'pred_seg_file_trn.shape: ', pred_seg_file_trn.shape)
+# print several 
+print(img_file_trn[0:5], seg_file_trn[0:5], pred_seg_file_trn[0:5])
+
 
 # create model
 input_shape = (128,128,1)
@@ -62,6 +72,7 @@ model_name = 'model'
 filepath=os.path.join(model_fld,  model_name +'-{epoch:03d}.hdf5')
 ff.make_folder([os.path.dirname(os.path.dirname(model_fld)), os.path.dirname(model_fld), model_fld, os.path.join(os.path.dirname(os.path.dirname(model_fld)), 'logs')])
 csv_logger = CSVLogger(os.path.join(os.path.dirname(os.path.dirname(model_fld)), 'logs',model_name + '_batch'+ str(val_batch) + '_training-log.csv')) 
+
 callbacks = [csv_logger,
                     ModelCheckpoint(filepath,          
                                     monitor='val_loss',
@@ -73,28 +84,32 @@ callbacks = [csv_logger,
 datagen = Generator_seg.DataGenerator(img_file_trn ,
                                     seg_file_trn,
                                     pred_seg_file_list = pred_seg_file_trn,
-                                    batch_size = 12,
+                                    batch_size = 16,
                                     num_classes = 4,
-                                    patient_num = img_file_trn.shape[0],
-                                    slice_num = 12, 
+                                    patient_num = img_file_trn.shape[0], 
+                                    slice_num = 16, 
                                     img_shape = [cg.dim[0],cg.dim[1]],
                                     shuffle = True,
+                                    augment = True,
+                                    normalize = True,
                                      )
 
 valgen = Generator_seg.DataGenerator(img_file_val ,
                                     seg_file_val,
                                     pred_seg_file_list = pred_seg_file_val,
-                                    batch_size = 12,
+                                    batch_size = 16,
                                     num_classes = 4,
                                     patient_num = img_file_val.shape[0],
-                                    slice_num = 12, 
+                                    slice_num = 16, 
                                     img_shape = [cg.dim[0],cg.dim[1]],
                                     shuffle = False,
+                                    augment = False,
+                                    normalize = True,
                                      ) 
 
 
 model.fit_generator(generator = datagen,
-                    epochs = 3,
+                    epochs = 200,
                     validation_data = valgen,
                     callbacks = callbacks,
                     verbose = 1,)

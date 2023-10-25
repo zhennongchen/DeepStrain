@@ -28,6 +28,7 @@ class DataGenerator(Sequence):
                 img_shape = None,
                 shuffle = None,
                 augment = None,
+                normalize = None,
                 seed = 10):
 
         self.img_file_list = img_file_list
@@ -41,6 +42,7 @@ class DataGenerator(Sequence):
         self.img_shape = img_shape
         self.shuffle = shuffle
         self.augment = augment
+        self.normalize = normalize
         self.seed = seed
 
 
@@ -123,10 +125,12 @@ class DataGenerator(Sequence):
                 # find out the slices that are not zero according to y
                 heart_slices = [z for z in range(y.shape[2]) if np.sum(y[:, :, z]) != 0]
                 assert len(heart_slices) > 0; assert len(heart_slices) <= self.slice_num
-
-                x = x[:, :, heart_slices]
-                y = y[:, :, heart_slices]
-                pred_seg = pred_seg[:, :, heart_slices]
+                final_slices = ff.pick_slices(np.arange(0,y.shape[2]), heart_slices, self.slice_num)
+        
+                x = x[:, :, final_slices]
+                y = y[:, :, final_slices]
+                pred_seg = pred_seg[:, :, final_slices]
+                # print('after picking slices, x, y, pred_seg shape: ',x.shape, y.shape, pred_seg.shape)
 
                 # add pred_seg results to y and then relabel:
                 yy = np.zeros(y.shape)
@@ -148,13 +152,19 @@ class DataGenerator(Sequence):
 
             # pick 128x128 patch according to center
             center = [img_x.shape[0]//2, img_x.shape[1]//2]
+            # print('original center: ',center)
             if self.augment == True:
                 # pick random 128x128 patch
-                shift_x = int(np.random.uniform(-5, 5))
-                shift_y = int(np.random.uniform(-5, 5))
-                center = [center[0] + shift_x, center[1] + shift_y]
+                while True:
+                    shift_x = int(np.random.uniform(-10, 10))
+                    shift_y = int(np.random.uniform(-10, 10))
+                    center_tem = [center[0] + shift_x, center[1] + shift_y]
+                    if center_tem[0] - 64 >= 0 and center_tem[0] + 64 <= img_x.shape[0] and center_tem[1] - 64 >= 0 and center_tem[1] + 64 <= img_x.shape[1]:
+                        center = center_tem
+                        break
             else:
                 center = center
+            # print('finally center: ',center)
             
             img_x = img_x[center[0]-64:center[0]+64,center[1]-64:center[1]+64]
             img_y = img_y[center[0]-64:center[0]+64,center[1]-64:center[1]+64]
@@ -176,10 +186,13 @@ class DataGenerator(Sequence):
             
             img_y = Data_processing.one_hot(img_y, num_classes = self.num_classes)
 
-            print('finally img_x and img_y shape: ',img_x.shape, img_y.shape)
+            # print('finally img_x and img_y shape: ',img_x.shape, img_y.shape)
 
             batch_x[i] = img_x
             batch_y[i] = img_y
-           
 
+        if self.normalize:
+            batch_x = ff.normalize_image(batch_x)
+           
+    
         return batch_x, batch_y

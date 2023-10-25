@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import tensorflow.keras.backend as kb
 from tensorflow.keras.layers import Layer
+from tensorflow.keras.callbacks import Callback
 import DeepStrain.Defaults as Defaults
 
 cg = Defaults.Parameters()
@@ -28,6 +29,17 @@ def dice_loss_selected_class(y_true, y_pred):
     union = tf.reduce_sum(y_true_selected) + tf.reduce_sum(y_pred_selected)
     dice = (2.0 * intersection + 1e-7) / (union + 1e-7)
     return 1.0 - dice
+
+
+class SaveModelEveryNEpochs(Callback):
+    def __init__(self, filepath, save_freq):
+        super(SaveModelEveryNEpochs, self).__init__()
+        self.filepath = filepath
+        self.save_freq = save_freq
+
+    def on_epoch_end(self, epoch, logs=None):
+        if (epoch + 1) % self.save_freq == 0:
+            self.model.save_weights(self.filepath, overwrite=True)
 
 
 

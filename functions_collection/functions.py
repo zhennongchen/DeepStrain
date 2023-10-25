@@ -258,6 +258,35 @@ def HD(pred,gt, pixel_size, min ):
     else:
         return np.min(np.array([hd1, hd2]))
 
+# function: pick slices:
+def pick_slices(all_slices, heart_slices, target_num):
+    a = np.asarray(all_slices)
+
+    b = np.asarray(heart_slices)
+
+    need_more_num = target_num - b.shape[0]
+
+    ahead_reach_end = False
+    behind_reach_end = False
+
+    ahead_num = need_more_num // 2
+    if b[0] - ahead_num < 0:
+        ahead_num = b[0]
+        ahead_reach_end = True
+
+    behind_num = need_more_num - ahead_num
+    if b[-1] + behind_num >= a.shape[0]:
+        behind_num = a.shape[0] -1 - b[-1]
+        if ahead_reach_end == False:
+            ahead_num = need_more_num - behind_num
+            if b[0] - ahead_num < 0:
+                ahead_num = b[0]
+                ahead_reach_end = True
+
+    final = np.concatenate((a[b[0]-ahead_num:b[0]], b, a[b[-1]+1 : b[-1]+behind_num+1]))
+    return final
+
+
 # function: coordinate conversion according to the affine matrix
 def coordinate_convert(grid_points, target_affine, original_affine):
     return apply_affine(np.linalg.inv(target_affine).dot(original_affine), grid_points)
