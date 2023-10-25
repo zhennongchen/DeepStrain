@@ -192,7 +192,7 @@ class DataGenerator(Sequence):
             batch_y[i] = img_y
 
         if self.normalize:
-            batch_x = ff.normalize_image(batch_x)
+            batch_x = ff.normalize_image(batch_x, axis = (1,2))
            
     
         return batch_x, batch_y
