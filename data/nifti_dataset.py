@@ -107,7 +107,7 @@ def resample_nifti(nifti,
     x=nifti_resampled.header.get_zooms()[:3]
     y=new_zooms
     if not np.allclose(x,y, rtol=1e-02):
-        print(x,y)
+        print('not all close: ', x,y)
         warnings.warn('Output resolutions are different than expected!')
 
     return nifti_resampled       

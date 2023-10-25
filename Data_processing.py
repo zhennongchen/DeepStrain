@@ -4,7 +4,6 @@ import os
 import DeepStrain.Defaults as Defaults
 import DeepStrain.functions_collection as ff
 
-cg = Defaults.Parameters()
 
 def crop_or_pad(array, target, value=0):
     """

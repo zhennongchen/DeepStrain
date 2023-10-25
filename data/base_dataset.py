@@ -157,7 +157,6 @@ def convert_back_to_nifti(data_resampled, nifti_info_subject, inv_256x256=False,
 
     if inv_256x256:
         data_resampled_mod_corr = roll_and_pad_256x256_to_center_inv(data_resampled, nifti_info=nifti_info_subject)
-        print('in function, data_Resampled shape: ',  data_resampled_mod_corr.shape)
     else:
         data_resampled_mod_corr = data_resampled
         
@@ -169,8 +168,6 @@ def convert_back_to_nifti(data_resampled, nifti_info_subject, inv_256x256=False,
     data_resampled, affine_resampled = reslice(data_resampled_mod_corr, 
                                                affine_resampled, zooms_resampled, zooms, order=order, mode=mode)
     nifti = nib.Nifti1Image(data_resampled, affine_resampled)
-
-    print('in function, after resample: ', data_resampled.shape)
     
     return nifti
 

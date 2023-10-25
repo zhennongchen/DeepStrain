@@ -28,7 +28,6 @@ from DeepStrain.models.dense_image_warp import dense_image_warp3d as warp
 
 cg = Defaults.Parameters()
 
-
 trial_name = 'fine_tune_carmen'
 data_sheet = os.path.join(cg.deep_dir,'data/Patient_list','Patient_list_for_Seg.xlsx')
 

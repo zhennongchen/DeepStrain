@@ -28,7 +28,7 @@ cg = Defaults.Parameters()
 
 trial_name = 'fine_tune_carson'
 val_batch = 9
-model_file =  os.path.join(cg.deep_dir,'models/fine_tune_carson/models/batch_9_first_round/model-042.hdf5')
+model_file =  os.path.join(cg.deep_dir,'models/trained/carson_Jan2021.h5')
 
 
 # build list
@@ -44,9 +44,9 @@ _,_,_,_,_,_, img_file_val, seg_file_val, pred_seg_file_val,_= b.__build__(batch_
 # img_file_trn = img_file_trn[n]; seg_file_trn = seg_file_trn[n]; pred_seg_file_trn = pred_seg_file_trn[n]
 # n = np.arange(0,1,1)
 # img_file_val = img_file_val[n]; seg_file_val = seg_file_val[n]; pred_seg_file_val = pred_seg_file_val[n]
-img_file_trn = np.tile(img_file_trn, 20)
-seg_file_trn = np.tile(seg_file_trn, 20)
-pred_seg_file_trn = np.tile(pred_seg_file_trn, 20)
+img_file_trn = np.tile(img_file_trn, 10)
+seg_file_trn = np.tile(seg_file_trn, 10)
+pred_seg_file_trn = np.tile(pred_seg_file_trn, 10)
 
 print('img_file_trn.shape: ', img_file_trn.shape, 'seg_file_trn.shape: ', seg_file_trn.shape, 'pred_seg_file_trn.shape: ', pred_seg_file_trn.shape)
 # print several 
