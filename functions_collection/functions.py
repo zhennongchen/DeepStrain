@@ -9,7 +9,7 @@ from scipy.spatial.distance import directed_hausdorff
 from scipy.interpolate import RegularGridInterpolator
 from nibabel.affines import apply_affine
 import re
-import cv2 
+# import cv2 
 from skimage.measure import label, regionprops
 
 # function: normalize the CMR image
@@ -364,21 +364,21 @@ def XX_to_ID_00XX(num):
         return 'ID_' + str(num)
 
 # function: make movies
-def make_movies(save_path,pngs,fps):
-    mpr_array=[]
-    i = cv2.imread(pngs[0])
-    h,w,l = i.shape
+# def make_movies(save_path,pngs,fps):
+#     mpr_array=[]
+#     i = cv2.imread(pngs[0])
+#     h,w,l = i.shape
 
-    for j in pngs:
-        img = cv2.imread(j)
-        mpr_array.append(img)
+#     for j in pngs:
+#         img = cv2.imread(j)
+#         mpr_array.append(img)
 
 
-    # save movies
-    out = cv2.VideoWriter(save_path,cv2.VideoWriter_fourcc(*'mp4v'),fps,(w,h))
-    for j in range(len(mpr_array)):
-        out.write(mpr_array[j])
-    out.release()
+#     # save movies
+#     out = cv2.VideoWriter(save_path,cv2.VideoWriter_fourcc(*'mp4v'),fps,(w,h))
+#     for j in range(len(mpr_array)):
+#         out.write(mpr_array[j])
+#     out.release()
 
 
 # function: remove scattered regions in a binary image

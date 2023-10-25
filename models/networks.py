@@ -193,6 +193,7 @@ class CarMEN():
         V_0 = keras.Input(shape=self.opt.volume_shape) 
         V_t = keras.Input(shape=self.opt.volume_shape)
         V   = keras.layers.Concatenate(axis=-1)([V_0, V_t])
+        print('in network the input shape: ', V.shape)
 
         u = encoder_decoder(V, nchannels=3, map_activation=None)
                        
@@ -202,7 +203,7 @@ class CarMEN():
         else:
             inputs  = []
             outputs = []
-            loss_w  = []
+            loss_w  = [] 
             if self.opt.lambda_i > 0.0:
                 # 1. Intensity loss term
                 V_0_pred = warp(V_t, motion_estimates)

@@ -28,7 +28,7 @@ cg = Defaults.Parameters()
 
 trial_name = 'fine_tune_carson'
 val_batch = 9
-data_sheet = os.path.join(cg.deep_dir,'data/Patient_list','Patient_list_version1.xlsx')
+data_sheet = os.path.join(cg.deep_dir,'data/Patient_list','Patient_list_for_seg.xlsx')
 
 # build list
 batch_list = [0,1,2,3,4,5,6,7,8,9]; batch_list.pop(val_batch)
