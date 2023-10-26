@@ -2,14 +2,12 @@
 
 import numpy as np
 import random
-import tensorflow as tf
+import os
 import nibabel as nb
+from scipy.ndimage.measurements import center_of_mass
 from tensorflow.keras.utils import Sequence
 import DeepStrain.functions_collection as ff
-import DeepStrain.models.networks as network
 import DeepStrain.Defaults as Defaults
-import DeepStrain.Hyperparameters as hyper
-import DeepStrain.Build_list.Build_list as Build_list
 import DeepStrain.Data_processing as Data_processing
 
 cg = Defaults.Parameters()
@@ -18,181 +16,102 @@ cg = Defaults.Parameters()
 class DataGenerator(Sequence):
 
     def __init__(self,
-                img_file_list,
-                seg_file_list,
-                pred_seg_file_list,
-                batch_size,
-                num_classes,
-                patient_num = None, 
-                slice_num = None, 
-                img_shape = None,
-                shuffle = None,
-                augment = None,
+                patient_id,
+                image_folder,
+                seg_folder,
+                template_tf,
+                target_tf_delta,  # target time frame - template time frame
+                heart_slices, 
+                batch_size = 1,
+                img_shape = None,        
                 normalize = None,
                 seed = 10):
-
-        self.img_file_list = img_file_list
-        self.seg_file_list = seg_file_list
-        self.pred_seg_file_list = pred_seg_file_list
+        
+        self.patient_id = patient_id
+        self.image_folder = image_folder
+        self.seg_folder = seg_folder
+        self.template_tf = template_tf
+        self.target_tf_delta = target_tf_delta
+        self.heart_slices = heart_slices
         self.batch_size = batch_size
-        self.num_classes = num_classes
-
-        self.patient_num = patient_num
-        self.slice_num = slice_num
         self.img_shape = img_shape
-        self.shuffle = shuffle
-        self.augment = augment
         self.normalize = normalize
         self.seed = seed
-
 
         self.on_epoch_end()
         
     def __len__(self):
-        return self.img_file_list.shape[0] *  ( self.slice_num) // (self.batch_size)
+        return self.target_tf_delta.shape[0] // (self.batch_size)
 
     def on_epoch_end(self):
-        
         self.seed += 1
-        # print('seed is: ',self.seed)
 
-        self.indices = []
+        self.indices = np.arange(self.target_tf_delta.shape[0])
 
-        if self.shuffle == False:
-            patient_list = np.arange(self.patient_num)
-        else:
-            patient_list = np.random.permutation(self.patient_num)
-
-        for p in patient_list:
-            if self.shuffle == False:
-                slice_list = np.arange(self.slice_num)
-            else:
-                slice_list = np.random.permutation(self.slice_num)
-            for s in slice_list:
-                self.indices.append([p,s])
-        
-        self.indices = np.asarray(self.indices)
         # print('all indexes: ', self.indices,len(self.indices))
 
     def __getitem__(self,index):
 
         # 'Generate indexes of the batch'
-        total_slice = self.patient_num * self.slice_num
-        current_index = (index * self.batch_size) % total_slice
-        if total_slice > current_index + self.batch_size:   # the total number of cases is adequate for next loop
-            current_batch_size = self.batch_size
-        else:
-            current_batch_size = total_slice - current_index  # approaching to the tend, not adequate, should reduce the batch size
+        current_index = (index * self.batch_size) % self.target_tf_delta.shape[0]
         
-        indexes = self.indices[current_index : current_index + current_batch_size]
+        indexes = self.indices[current_index : current_index + self.batch_size]
 
         # print('indexes in this batch: ',indexes)
 
         # allocate memory
-        batch_x = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1]]) + (1,))
-        batch_y = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1]]) + (self.num_classes,))
-        
-        volume_already_load = []
-        load = False
+        batch_v0_input = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (1,))
+        batch_vt_input = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (1,))
+        batch_mt_input = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (3,))
 
+        batch_MVF_output = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (3,))
+        batch_v0_output = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (1,))
+        batch_m0_output = np.zeros(tuple([self.batch_size]) + tuple([self.img_shape[0],self.img_shape[1], self.img_shape[2]]) + (3,))
+
+        # load template frame:
+        v0_file = os.path.join(self.image_folder, 'Org3D_frame' + str(self.template_tf) + '.nii.gz' )
+        m0_file = os.path.join(self.seg_folder, 'pred_seg_frame' + str(self.template_tf) + '.nii.gz' )
+        if os.path.isfile(m0_file) == 0:
+            m0_file = os.path.join(self.seg_folder, 'SAX_ED_seg.nii.gz' )
+        v0 = nb.load(v0_file).get_fdata()[:,:,self.heart_slices[0]:self.heart_slices[1]]
+        m0 = np.round(nb.load(m0_file).get_fdata()[:,:,self.heart_slices[0]:self.heart_slices[1]]).astype(np.int)
+        center = center_of_mass(m0==2)
+        v0 = Data_processing.crop_or_pad(v0[int(center[0]) - 64 : int(center[0]) + 64, int(center[1]) - 64 : int(center[1]) + 64, :], self.img_shape, value = np.min(v0))
+        m0 = Data_processing.crop_or_pad(m0[int(center[0]) - 64 : int(center[0]) + 64, int(center[1]) - 64 : int(center[1]) + 64, :], self.img_shape, value = 0)
+
+        if self.normalize is not None:
+            v0 = ff.normalize(v0)
+        v0 = v0[...,np.newaxis]
+        m0 = Data_processing.one_hot(m0, num_classes = 3)
+        # print('v0 shape: ', v0.shape, 'm0 shape: ', m0.shape, 'max and min of v0: ', np.max(v0), np.min(v0), 'unique of m0: ', np.unique(m0))
+        
         for i, j in enumerate(indexes):
-            # print('i and j: ',i,j)
-            case = j[0]
-            # Is it a new case so I need to load the image volume?
-            if i == 0:
-                volume_already_load.append(case)
-                load = True
-                # print('let us start', i, case, volume_already_load[0],load)
-            else:
-                if case == volume_already_load[0]:
-                    load = False
-                    # print(i, case, volume_already_load[0],load)
-                else:
-                    load = True
-                    volume_already_load[0] = case
-                    # print(i, case, volume_already_load[0],load)
-                
-            if load == True:
-                x_file = self.img_file_list[j[0]]; x = nb.load(x_file).get_fdata()
-                # print('now loading x_file : ',x_file, ' shape: ',x.shape) 
-                y_file = self.seg_file_list[j[0]]; y = np.round(nb.load(y_file).get_fdata()).astype(np.int32)
-                assert np.unique(y).shape[0] == 3
-                # print('now loading y_file : ',y_file, ' shape: ',y.shape, ' unique: ',np.unique(y))
-                pred_seg_file = self.pred_seg_file_list[j[0]]; pred_seg = np.round(nb.load(pred_seg_file).get_fdata()).astype(np.int32)
-                assert np.unique(pred_seg).shape[0] >= 3
-                # print('now loading pred_seg_file : ',pred_seg_file, ' shape: ',pred_seg.shape, ' unique: ',np.unique(pred_seg))
+            # load template time frame
+            delta = self.target_tf_delta[j]
+            target_tf = (self.template_tf + delta)
+            if target_tf > 25:
+                target_tf = target_tf - 25
+            # print('index here: ', i, j,delta, ' target time frame: ', target_tf)
+            vt_file = os.path.join(self.image_folder, 'Org3D_frame' + str(target_tf) + '.nii.gz' )
+            mt_file = os.path.join(self.seg_folder, 'pred_seg_frame' + str(target_tf) + '.nii.gz' )
+            if os.path.isfile(mt_file) == 0:
+                mt_file = os.path.join(self.seg_folder, 'SAX_ES_seg.nii.gz' )
+            vt = nb.load(vt_file).get_fdata()[:,:,self.heart_slices[0]:self.heart_slices[1]]
+            mt = np.round(nb.load(mt_file).get_fdata()[:,:,self.heart_slices[0]:self.heart_slices[1]]).astype(np.int)
+            vt = Data_processing.crop_or_pad(vt[int(center[0]) - 64 : int(center[0]) + 64, int(center[1]) - 64 : int(center[1]) + 64, :], self.img_shape, value = np.min(vt))
+            mt = Data_processing.crop_or_pad(mt[int(center[0]) - 64 : int(center[0]) + 64, int(center[1]) - 64 : int(center[1]) + 64, :], self.img_shape, value = 0)
 
-                # find out the slices that are not zero according to y
-                heart_slices = [z for z in range(y.shape[2]) if np.sum(y[:, :, z]) != 0]
-                assert len(heart_slices) > 0; assert len(heart_slices) <= self.slice_num
-                final_slices = ff.pick_slices(np.arange(0,y.shape[2]), heart_slices, self.slice_num)
-        
-                x = x[:, :, final_slices]
-                y = y[:, :, final_slices]
-                pred_seg = pred_seg[:, :, final_slices]
-                # print('after picking slices, x, y, pred_seg shape: ',x.shape, y.shape, pred_seg.shape)
+            if self.normalize is not None:
+                vt = ff.normalize(vt)
+            vt = vt[...,np.newaxis]
+            mt = Data_processing.one_hot(mt, num_classes = 3)
+            # print('vt shape: ', vt.shape, 'mt shape: ', mt.shape, 'max and min of vt: ', np.max(vt), np.min(vt), 'unique of mt: ', np.unique(mt))
 
-                # add pred_seg results to y and then relabel:
-                yy = np.zeros(y.shape)
-                yy[pred_seg == 3] = 3
-                yy[y == 1] = 1
-                yy[y == 2] = 2
-                yy = Data_processing.relabel(yy, original_label=1, new_label=4)
-                yy = Data_processing.relabel(yy, original_label=3, new_label=1)
-                yy = Data_processing.relabel(yy, original_label=4, new_label=3)
+            batch_v0_input[i] = v0
+            batch_vt_input[i] = vt
+            batch_mt_input[i] = mt
+            batch_v0_output[i] = v0
+            batch_m0_output[i] = m0
 
-                y = np.copy(yy).astype(np.int32)
-
-                x = Data_processing.crop_or_pad(x, [x.shape[0], x.shape[1], self.slice_num])
-                y = Data_processing.crop_or_pad(y, [y.shape[0], y.shape[1], self.slice_num])
-
-            # pick slice
-            img_x = x[:, :, j[1]]
-            img_y = y[:, :, j[1]]
-
-            # pick 128x128 patch according to center
-            center = [img_x.shape[0]//2, img_x.shape[1]//2]
-            # print('original center: ',center)
-            if self.augment == True:
-                # pick random 128x128 patch
-                while True:
-                    shift_x = int(np.random.uniform(-10, 10))
-                    shift_y = int(np.random.uniform(-10, 10))
-                    center_tem = [center[0] + shift_x, center[1] + shift_y]
-                    if center_tem[0] - 64 >= 0 and center_tem[0] + 64 <= img_x.shape[0] and center_tem[1] - 64 >= 0 and center_tem[1] + 64 <= img_x.shape[1]:
-                        center = center_tem
-                        break
-            else:
-                center = center
-            # print('finally center: ',center)
-            
-            img_x = img_x[center[0]-64:center[0]+64,center[1]-64:center[1]+64]
-            img_y = img_y[center[0]-64:center[0]+64,center[1]-64:center[1]+64]
-
-            if self.augment == True:
-                # random flip
-                flip = np.random.randint(0,2)
-                if flip == 1:
-                    img_x = np.flip(img_x, axis = 0)
-                    img_y = np.flip(img_y, axis = 0)
-                flip = np.random.randint(0,2)
-                if flip == 1:
-                    img_x = np.flip(img_x, axis = 1)
-                    img_y = np.flip(img_y, axis = 1)
-
-
-            # add one axis in the last or do the one-hot encoding
-            img_x = np.expand_dims(img_x, axis = -1)
-            
-            img_y = Data_processing.one_hot(img_y, num_classes = self.num_classes)
-
-            # print('finally img_x and img_y shape: ',img_x.shape, img_y.shape)
-
-            batch_x[i] = img_x
-            batch_y[i] = img_y
-
-        if self.normalize:
-            batch_x = ff.normalize_image(batch_x, axis = (1,2))
-           
-    
-        return batch_x, batch_y
+        # return [batch_v0_input, batch_vt_input], [batch_MVF_output]
+        return [batch_v0_input, batch_vt_input, batch_mt_input], [batch_MVF_output, batch_v0_output, batch_m0_output]

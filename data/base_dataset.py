@@ -118,7 +118,7 @@ class Transforms():
         return x    
     
 
-def _centercrop(x):
+def _centercrop(x): 
     nx, ny = x.shape[:2]
     return x[nx//2-64:nx//2+64,ny//2-64:ny//2+64]
 

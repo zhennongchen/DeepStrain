@@ -20,6 +20,43 @@ def learning_rate_step_decay_classic(epoch, lr, decay = cg.decay_rate, initial_p
     print("Learning rate plan for epoch {} is {}.".format(epoch + 1, 1.0 * lrate))
     return np.float(lrate)
 
+def learning_rate_step_decay_slower(epoch, lr, decay = cg.decay_rate, initial_power=-5, start_epoch = cg.start_epoch):
+    """
+    The learning rate begins at 10^initial_power,
+    and decreases by a factor of 10 every `step` epochs.
+    """
+    ##
+    lrate = (1/ (1 + decay * (epoch + start_epoch))) * (10 ** initial_power)
+
+    print("Learning rate plan for epoch {} is {}.".format(epoch + 1, 1.0 * lrate))
+    return np.float(lrate)
+
+
+def loss_smooth(y_true, y_pred):
+    # Calculate smoothness loss for each dimension
+    smoothness_x = tf.reduce_mean(tf.square(tf.image.image_gradients(y_pred[...,0])))
+    smoothness_y = tf.reduce_mean(tf.square(tf.image.image_gradients(y_pred[...,1])))
+    # Take the average of the smoothness losses
+    return  (smoothness_x + smoothness_y) / 2.0
+
+def loss_dice(y_true, y_pred):
+
+    intersection = tf.reduce_sum(y_true * y_pred)
+    union = tf.reduce_sum(y_true) + tf.reduce_sum(y_pred)
+    dice = (2.0 * intersection + 1e-7) / (union + 1e-7)
+    return 1.0 - dice
+
+def loss_mae(y_true, y_pred):
+    # Create a mask for pixels greater than 0 in y_true
+    mask = tf.cast(y_true > 0, tf.float32)
+
+    # Apply the mask to y_true and y_pred
+    masked_y_true = y_true * mask
+    masked_y_pred = y_pred * mask
+
+    # Calculate the absolute difference between masked_y_true and masked_y_pred
+    return  tf.reduce_mean(tf.abs(masked_y_true - masked_y_pred))
+
 
 def dice_loss_selected_class(y_true, y_pred):
     y_true_selected = tf.gather(y_true, [0, 2, 3], axis=-1)
@@ -31,15 +68,6 @@ def dice_loss_selected_class(y_true, y_pred):
     return 1.0 - dice
 
 
-class SaveModelEveryNEpochs(Callback):
-    def __init__(self, filepath, save_freq):
-        super(SaveModelEveryNEpochs, self).__init__()
-        self.filepath = filepath
-        self.save_freq = save_freq
-
-    def on_epoch_end(self, epoch, logs=None):
-        if (epoch + 1) % self.save_freq == 0:
-            self.model.save_weights(self.filepath, overwrite=True)
 
 
 

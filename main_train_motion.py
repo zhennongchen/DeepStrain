@@ -15,6 +15,7 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Input, Concatenate
 from tensorflow.keras.callbacks import Callback
+from tensorflow.keras.models import save_model
 from tensorflow.keras import backend as K
 from tensorflow.keras.activations import softmax
 
@@ -23,97 +24,100 @@ import DeepStrain.models.networks as network
 import DeepStrain.Defaults as Defaults
 import DeepStrain.Hyperparameters as hyper
 import DeepStrain.Build_list.Build_list as Build_list
-import DeepStrain.Generator_seg as Generator_seg
+import DeepStrain.Generator_motion as Generator_motion
 from DeepStrain.models.dense_image_warp import dense_image_warp3d as warp
 
 cg = Defaults.Parameters()
 
+##############################################
 trial_name = 'fine_tune_carmen'
-data_sheet = os.path.join(cg.deep_dir,'data/Patient_list','Patient_list_for_Seg.xlsx')
+data_sheet = os.path.join(cg.deep_dir,'data/Patient_list','Patient_list_for_motion_checked.xlsx')
+patient_index = 0
+maximum_epoch = 20
+##############################################
 
 # build list
 b = Build_list.Build(data_sheet)
-_,_,_,_,_,_, img_file_trn, seg_file_trn, pred_seg_file_trn,_ = b.__build__(batch_list = [0])
+patient_id ,our_id,_ ,ed ,es , image_folder ,seg_folder ,pred_seg_folder ,_ , start_slice, end_slice = b.build_for_personalized_motion(patient_index)
 
-n = np.arange(1,2,1)
-img_file_trn = img_file_trn[n]; seg_file_trn = seg_file_trn[n]; pred_seg_file_trn = pred_seg_file_trn[n]
-print('img_file_trn.shape: ', img_file_trn.shape, 'seg_file_trn.shape: ', seg_file_trn.shape, 'pred_seg_file_trn.shape: ', pred_seg_file_trn.shape)
-print(img_file_trn[0:5], seg_file_trn[0:5], pred_seg_file_trn[0:5])
-
+print(patient_id)
 
 # create model
 V_0_input = Input(shape = [128,128,16,1]) 
 V_t_input = Input(shape = [128,128,16,1]) 
-M_0_input = Input(shape = [128,128,16,3])
 M_t_input = Input(shape = [128,128,16,3])
 M_t_split = tf.split(M_t_input, M_t_input.shape[-1], -1)
 
 input   = Concatenate(axis=-1)([V_0_input, V_t_input])
+print('input shape: ',input.shape)
 motion_estimates = network.encoder_decoder(input, nchannels=3, map_activation=None)
-V_0_pred = warp(V_t_input, motion_estimates)
+V_0_pred = warp(V_t_input, motion_estimates, name = 'warp' )
 M_0_pred  = K.concatenate([warp(K.cast(mt, K.dtype(V_t_input)), motion_estimates) for mt in M_t_split], -1)    
-M_0_pred  = softmax(M_0_pred) 
+M_0_pred  = softmax(M_0_pred, name = 'softmax') 
 print('shape: ', V_0_pred.shape, M_0_pred.shape)
 
-model = Model(inputs = [V_0_input, V_t_input, M_0_input, M_t_input], outputs = [motion_estimates,V_0_pred, M_0_pred])
+model = Model(inputs = [V_0_input, V_t_input, M_t_input], outputs = [motion_estimates,V_0_pred, M_0_pred])
+# model = Model(inputs = [V_0_input, V_t_input], outputs = [motion_estimates])
 
 model_file =  os.path.join(cg.deep_dir,'models/trained/carmen_Jan2021.h5')
+# model_file = os.path.join(cg.deep_dir,'models/fine_tune_carmen/ID_0015/models/model-003.hdf5')
 model.load_weights(model_file)
-
-
-# load data
 
 
 # # compile model
 # opt = Adam(lr = 1e-4)
 # model.compile(optimizer= opt, 
-#                   loss= [hyper.dice_loss_selected_class],)
+#                 loss = [hyper.loss_smooth, hyper.loss_mae, hyper.loss_dice],
+#                 loss_weights=[0,0,1])
 
-# # set callbacks
-# model_fld = os.path.join(cg.deep_dir, 'models', trial_name, 'models', 'batch_'+str(val_batch))
-# model_name = 'model' 
-# filepath=os.path.join(model_fld,  model_name +'-{epoch:03d}.hdf5')
-# ff.make_folder([os.path.dirname(os.path.dirname(model_fld)), os.path.dirname(model_fld), model_fld, os.path.join(os.path.dirname(os.path.dirname(model_fld)), 'logs')])
-# csv_logger = CSVLogger(os.path.join(os.path.dirname(os.path.dirname(model_fld)), 'logs',model_name + '_batch'+ str(val_batch) + '_training-log.csv')) 
+# # # set callbacks
+# model_fld = os.path.join(cg.deep_dir, 'models', trial_name, patient_id, 'models')
+# ff.make_folder([os.path.dirname(os.path.dirname(model_fld)), os.path.dirname(model_fld), model_fld, os.path.join(os.path.dirname(model_fld), 'logs')])
+# csv_logger = CSVLogger(os.path.join(os.path.dirname(model_fld), 'logs', 'training-log.csv')) 
+
+# class CustomCallback(Callback):
+#     def __init__(self, model_fld, max_epoch, stopping_patience = 5):
+#         super(CustomCallback, self).__init__()
+#         self.model_fld = model_fld
+#         self.no_improvement_count = 0
+#         self.min_loss = float('inf')
+#         self.max_epoch = max_epoch
+#         self.stopping_patience = stopping_patience
+
+#     def on_epoch_end(self, epoch, logs=None):
+   
+#         current_loss = logs.get('loss')
+#         if current_loss < self.min_loss:
+#             self.min_loss = current_loss
+#             self.no_improvement_count = 0
+#         else:
+#             self.no_improvement_count += 1
+
+#         if self.no_improvement_count >= self.stopping_patience or epoch == self.max_epoch - 1:  # early stopping
+#             epoch_str = str(epoch + 1).zfill(3)  # Format epoch number
+#             print(epoch_str)
+#             self.model.stop_training = True
+#             save_model(self.model, os.path.join(self.model_fld,  'model-'+epoch_str+'.hdf5'))  # Save the last model
 
 # callbacks = [csv_logger,
-#                     ModelCheckpoint(filepath,          
-#                                     monitor='val_loss',
-#                                     save_best_only=False,),
-#                      LearningRateScheduler(hyper.learning_rate_step_decay_classic),   
+#                 CustomCallback(model_fld,maximum_epoch), 
+#                     LearningRateScheduler(hyper.learning_rate_step_decay_slower),   
 #                     ]
 
-# # Fit
-# datagen = Generator_seg.DataGenerator(img_file_trn ,
-#                                     seg_file_trn,
-#                                     pred_seg_file_list = pred_seg_file_trn,
-#                                     batch_size = 16,
-#                                     num_classes = 4,
-#                                     patient_num = img_file_trn.shape[0], 
-#                                     slice_num = 16, 
-#                                     img_shape = [cg.dim[0],cg.dim[1]],
-#                                     shuffle = True,
-#                                     augment = True,
-#                                     normalize = True,
-#                                      )
-
-# valgen = Generator_seg.DataGenerator(img_file_val ,
-#                                     seg_file_val,
-#                                     pred_seg_file_list = pred_seg_file_val,
-#                                     batch_size = 16,
-#                                     num_classes = 4,
-#                                     patient_num = img_file_val.shape[0],
-#                                     slice_num = 16, 
-#                                     img_shape = [cg.dim[0],cg.dim[1]],
-#                                     shuffle = False,
-#                                     augment = False,
-#                                     normalize = True,
-#                                      ) 
+# # # Fit
+# datagen = Generator_motion.DataGenerator(patient_id,
+#                                         image_folder,
+#                                         seg_folder,
+#                                         ed,
+#                                         np.array([es - ed]),
+#                                         heart_slices = [start_slice, end_slice],
+#                                         batch_size = 1,
+#                                         img_shape = [128,128,16],        
+#                                         normalize = True,)
 
 
 # model.fit_generator(generator = datagen,
-#                     epochs = 200,
-#                     validation_data = valgen,
+#                     epochs = 300,
 #                     callbacks = callbacks,
 #                     verbose = 1,)
 

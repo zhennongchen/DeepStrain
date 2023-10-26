@@ -19,7 +19,7 @@ export CG_NUM_CLASSES=4
 # set learning epochs
 export CG_EPOCHS=200
 export CG_LR_EPOCHS=25 # the number of epochs for learning rate change 
-export CG_START_EPOCH=10
+export CG_START_EPOCH=0
 export CG_DECAY_RATE=0.01
 export CG_INITIAL_POWER=-4
 export CG_REGULARIZER_COEFF=0.2

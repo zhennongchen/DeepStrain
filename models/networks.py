@@ -142,7 +142,7 @@ def encoder_decoder(x, gf=64, nchannels=3, map_activation=None):
     u6 = decoder(Conv, UpSampling, u5, d1, gf*1, strides=strides, kernel_size=kernel_size)
 
     u7 = UpSampling(size=strides)(u6)
-    u7 = Conv(nchannels, kernel_size=kernel_size, strides=1, padding='same', activation=map_activation)(u7)    
+    u7 = Conv(nchannels, kernel_size=kernel_size, strides=1, padding='same', activation=map_activation, name = 'unet_output')(u7)    
     
     return u7 
 
@@ -190,12 +190,22 @@ class CarMEN():
                           optimizer=self.optimizer(learning_rate=self.opt.netME_lr))
             
     def get_model(self):    
+        from tensorflow.keras.models import Model
+        from tensorflow.keras.layers import Input, Concatenate
+        from tensorflow.keras.callbacks import Callback
+        from tensorflow.keras.models import save_model
+        from tensorflow.keras import backend as K
+        from tensorflow.keras.activations import softmax
+
+
         V_0 = keras.Input(shape=self.opt.volume_shape) 
         V_t = keras.Input(shape=self.opt.volume_shape)
         V   = keras.layers.Concatenate(axis=-1)([V_0, V_t])
-        print('in network the input shape: ', V.shape)
+        print('in networks, V shape: ',V.shape)
 
         u = encoder_decoder(V, nchannels=3, map_activation=None)
+
+
                        
         if not self.opt.isTrain:
             model = keras.Model(inputs=[V_0, V_t], outputs=u)
