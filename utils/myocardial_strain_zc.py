@@ -110,43 +110,39 @@ def convert_to_polar(mask, E):
     return Err, Ecc, Erc, Ecr
 
     
-def convert_to_aha4d(tensor, mask):
-    Tensor = tensor.copy()
-    Mask   = mask.copy()
+# def convert_to_aha4d(tensor, mask):
+#     Tensor = tensor.copy()
+#     Mask   = mask.copy()
 
-    Tensor[Mask!=2,:] = 0
+#     Tensor[Mask!=2,:] = 0
 
-    # rotate to have RV center of mass on the right
-    angle  = _get_lv2rv_angle(Mask)
-    Tensor = rotate(Tensor,  -angle, reshape=False, order=0)
-    Mask   = rotate(Mask, -angle, reshape=False, order=1).clip(0,3).round()
+#     # rotate to have RV center of mass on the right
+#     angle  = _get_lv2rv_angle(Mask)
+#     Tensor = rotate(Tensor,  -angle, reshape=False, order=0)
+#     Mask   = rotate(Mask, -angle, reshape=False, order=1).clip(0,3).round()
 
-    # roll to center 
-    cx, cy = center_of_mass(Mask>1)[:2]
-    Tensor = np.flipud(np.rot90(_roll_to_center(Tensor, cx, cy)))
-    Mask   = np.flipud(np.rot90(_roll_to_center(Mask, cx, cy)))
+#     # roll to center 
+#     cx, cy = center_of_mass(Mask>1)[:2]
+#     Tensor = np.flipud(np.rot90(_roll_to_center(Tensor, cx, cy)))
+#     Mask   = np.flipud(np.rot90(_roll_to_center(Mask, cx, cy)))
 
-    # remove slices that do not contain tissue labels
-    ID     = Mask.sum(axis=(0,1))>0
-    Mask   = Mask[:,:,ID]
-    Tensor = Tensor[:,:,ID]
+#     # remove slices that do not contain tissue labels
+#     ID     = Mask.sum(axis=(0,1))>0
+#     Mask   = Mask[:,:,ID]
+#     Tensor = Tensor[:,:,ID]
     
-    return Tensor, Mask
-    
-class PolarMap():
-    
-    def __init__(self, Err, Ecc, mask):
-        """ Plot Err and Ecc in a PolarMap using a segmentation of the heart as reference. 
-            Assuming mask==2 yields the myocardium labels. 
-        
-        """
-        
+#     return Tensor, Mask
+
+class Rotate_data():
+    def __init__(self, Err, Ecc, mask, insertion_p1, insertion_p2, non_slice_num):
         self.Err  = Err
         self.Ecc  = Ecc
         self.mask = mask
-        
-    def project_to_aha_polar_map(self):
-       
+        self.insertion_p1 = insertion_p1
+        self.insertion_p2 = insertion_p2
+        self.non_slice_num = non_slice_num
+
+    def rotate_orientation(self):
         Err  = self.Err.copy()
         Ecc  = self.Ecc.copy()
         mask = self.mask.copy()
@@ -155,23 +151,34 @@ class PolarMap():
         Ecc[mask!=2] = 0
 
         # rotate to have RV center of mass on the right
-        angle = _get_lv2rv_angle(mask)
+        angle,_,_,_,_ = _get_lv2rv_angle_using_insertion_points(mask, self.insertion_p1, self.insertion_p2)
         Ecc   = rotate(Ecc,  -angle, reshape=False, order=0)
         Err   = rotate(Err,  -angle, reshape=False, order=0)
-        mask  = rotate(mask, -angle, reshape=False, order=1).clip(0,3).round()  # RV在LV的正下方, 以LV slices的中间slice为reference
+        mask  = rotate(mask, -angle, reshape=False, order=1).clip(0,3).round()  
         
-        # roll to center 
+        # roll to center o
         cx, cy = center_of_mass(mask>1)[:2]
-        Ecc  = np.flipud(np.rot90(_roll_to_center(Ecc, cx, cy)))
-        Err  = np.flipud(np.rot90(_roll_to_center(Err, cx, cy)))
-        mask = np.flipud(np.rot90(_roll_to_center(mask, cx, cy)))
-        
+        Ecc_rot  = np.rot90(np.rot90(_roll_to_center(Ecc, cx, cy)))
+        Err_rot  = np.rot90(np.rot90(_roll_to_center(Err, cx, cy)))
+        mask_rot = np.rot90(np.rot90(_roll_to_center(mask, cx, cy)))  # RV is at left of LV, anterior wall at degree 0
+         
         # remove slices that do not contain tissue labels
-        ID   = mask.sum(axis=(0,1))>0
-        mask = mask[:,:,ID]
-        Err  = Err[:,:,ID]
-        Ecc  = Ecc[:,:,ID]
+        ID   = self.non_slice_num
+        mask_rot = mask_rot[:,:,ID]
+        Err_rot  = Err_rot[:,:,ID]
+        Ecc_rot  = Ecc_rot[:,:,ID]
+        return Err_rot, Ecc_rot, mask_rot, ID
 
+    
+class PolarMap():
+    
+    def __init__(self, Err, Ecc, mask):       
+        self.Err  = Err
+        self.Ecc  = Ecc
+        self.mask = mask
+
+        
+    def project_to_aha_polar_map(self):
 
         Err = Err.transpose((2,0,1))
         Ecc = Ecc.transpose((2,0,1))
@@ -180,7 +187,7 @@ class PolarMap():
         print('... circumferential strain')
         V_ecc = self._project_to_aha_polar_map(Ecc)
 
-        results = {'V_err':V_err, 'V_ecc':V_ecc, 'mask':mask}
+        results = {'V_err':V_err, 'V_ecc':V_ecc, 'mask':self.mask}
 
         return results
         
@@ -344,11 +351,17 @@ def _inpter2(Eij, k=10):
     
     return f(xq,yq)    
     
-def _get_lv2rv_angle(mask):
+def _get_lv2rv_angle_using_mask(mask):
     cx_lv, cy_lv = center_of_mass(mask>1)[:2]
     cx_rv, cy_rv = center_of_mass(mask==1)[:2]
     phi_angle    = _py_ang([cx_rv-cx_lv, cy_rv-cy_lv], [0, 1])
-    return phi_angle    
+    return phi_angle  
+
+def _get_lv2rv_angle_using_insertion_points(mask, insertion_p1, insertion_p2):
+    cx_lv, cy_lv = center_of_mass(mask>1)[:2]
+    cx_rv, cy_rv = (insertion_p1[0] + insertion_p2[0])//2 , (insertion_p1[1] + insertion_p2[1])//2
+    phi_angle    = _py_ang([cx_rv-cx_lv, cy_rv-cy_lv], [0, 1])
+    return phi_angle   , cx_lv, cy_lv, cx_rv, cy_rv 
     
     
     
