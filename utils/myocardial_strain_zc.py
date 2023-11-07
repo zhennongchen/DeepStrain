@@ -142,7 +142,10 @@ class Rotate_data():
         self.insertion_p2 = insertion_p2
         self.non_slice_num = non_slice_num
 
-    def rotate_orientation(self):
+    def rotate_orientation(self , for_visualization = False):
+        # goal: RV is at left of LV
+        # if for_visualization: the center of septum = 90 degree so that the center of anterior = 0 degree
+        # if not for visualization (for calculation and aha plot): the center of septum = 120 degree so that the boundary of anterior = 0 degree (thus the first segment 0-60 is anterior)
         Err  = self.Err.copy()
         Ecc  = self.Ecc.copy()
         mask = self.mask.copy()
@@ -150,18 +153,24 @@ class Rotate_data():
         Err[mask!=2] = 0
         Ecc[mask!=2] = 0
 
-        # rotate to have RV center of mass on the right
         angle,_,_,_,_ = _get_lv2rv_angle_using_insertion_points(mask, self.insertion_p1, self.insertion_p2)
-        Ecc   = rotate(Ecc,  -angle, reshape=False, order=0)
-        Err   = rotate(Err,  -angle, reshape=False, order=0)
-        mask  = rotate(mask, -angle, reshape=False, order=1).clip(0,3).round()  
+        if for_visualization:  # RVthe center of RV is 
+            Ecc   = rotate(Ecc,  -angle, reshape=False, order=0)
+            Err   = rotate(Err,  -angle, reshape=False, order=0)
+            mask  = rotate(mask, -angle, reshape=False, order=1).clip(0,3).round()  
+        else: # for calculation and AHA plot
+            Ecc   = rotate(Ecc,  -angle + 30, reshape=False, order=0)
+            Err   = rotate(Err,  -angle + 30, reshape=False, order=0)
+            mask  = rotate(mask, -angle + 30, reshape=False, order=1).clip(0,3).round()
+            
+
         
         # roll to center o
         cx, cy = center_of_mass(mask>1)[:2]
         Ecc_rot  = np.rot90(np.rot90(_roll_to_center(Ecc, cx, cy)))
         Err_rot  = np.rot90(np.rot90(_roll_to_center(Err, cx, cy)))
-        mask_rot = np.rot90(np.rot90(_roll_to_center(mask, cx, cy)))  # RV is at left of LV, anterior wall at degree 0
-         
+        mask_rot = np.rot90(np.rot90(_roll_to_center(mask, cx, cy))) 
+
         # remove slices that do not contain tissue labels
         ID   = self.non_slice_num
         mask_rot = mask_rot[:,:,ID]
@@ -177,11 +186,10 @@ class PolarMap():
         self.Ecc  = Ecc
         self.mask = mask
 
-        
     def project_to_aha_polar_map(self):
 
-        Err = Err.transpose((2,0,1))
-        Ecc = Ecc.transpose((2,0,1))
+        Err = self.Err.transpose((2,0,1))
+        Ecc = self.Ecc.transpose((2,0,1))
         print('... radial strain')
         V_err = self._project_to_aha_polar_map(Err)
         print('... circumferential strain')
@@ -231,7 +239,7 @@ class PolarMap():
         return V        
         
         
-    def construct_polar_map(self, tensor, start=30, stop=70, sigma=12):
+    def construct_AHA_map(self, tensor, start_slice_name, start=20, stop=80, sigma=12):
 
         E  = tensor.copy()
         mu = E[:,:,start:stop].mean()
@@ -248,27 +256,39 @@ class PolarMap():
 
         E = np.stack(np.array_split(E,nz,axis=1)) # put into original shape
 
-        E = gaussian_filter(E, sigma=sigma, mode='wrap')
-        E = gaussian_filter(E, sigma=sigma, mode='wrap')
+        # divide into apical, mid and basal layers
+        slices_per_layer = E.shape[0]//3
+        if start_slice_name == 'apex':
+            layer1 = E[0:slices_per_layer,...]
+            layer2 = E[slices_per_layer : slices_per_layer * 2 + 1,...]
+            layer3 = E[slices_per_layer * 2 + 1: E.shape[0],...]
+        
+        else: # start from "base"
+            layer1 = E[E.shape[0] - slices_per_layer :E.shape[0],...]
+            layer2 = E[E.shape[0] - slices_per_layer * 2 -1 : E.shape[0] - slices_per_layer,...]
+            layer3 = E[0: E.shape[0] - slices_per_layer * 2 -1,...]
 
-        E = [E[0][None]] + [E[1:3]] + np.array_split(E[3:], 2, axis=0) # 4 layer: apex, apical, mid, basal
+        E = [layer1, layer2, layer3]  ######### apical, mid, basal
 
-        E = [np.mean(E[i], axis=0) for i in range(4)] # calculate mean for each layer
-        E = np.concatenate(E, axis=1)  # shape (360, 4 * (stop - start))
+        E = [np.mean(E[i], axis=0) for i in range(3)] # calculate mean across all slices in each layer
+        E = np.concatenate(E, axis=1)  # shape (360, 3 * (stop - start))
 
-        old = E.shape[1]/4
-        for j in range(3):
-            xi = int(old//2+j*old)
-            xj = int(old+old//2+j*old)
-            E[:,xi:xj] = gaussian_filter(E[:,xi:xj], sigma=sigma, mode='wrap')
-            E[:,xi:xj] = gaussian_filter(E[:,xi:xj], sigma=sigma, mode='wrap')
-
-        E = gaussian_filter(E, sigma=sigma, mode='wrap')
-        E = gaussian_filter(E, sigma=sigma, mode='wrap')
-
-        mu = [mu] + self._get_17segments(E)
+        mu = [mu] + self._get_16segments(E) +[0]
 
         return E, mu 
+    
+    def _get_16segments(self, data):
+        c2,c3,c4 = np.array_split(data,3,axis=-1)
+
+        c4 = [np.mean(ci) for ci in np.array_split(c4,6,axis=0)]  # basal
+     
+        c3 = [np.mean(ci) for ci in np.array_split(c3,6,axis=0)]  # mid
+
+        c2 = [np.mean(ci) for ci in np.array_split(c2,4,axis=0)]  # apical
+
+        c = c4 + c3 + c2 
+        return c
+
     
     def _get_17segments(self, data):
         c1,c2,c3,c4 = np.array_split(data,4,axis=-1)
@@ -398,7 +418,7 @@ def plot_bullseye(data,mu,vmin=None,vmax=None, savepath=None,cmap='RdBu_r', labe
                   std=None,cbar=False,color='white', fs=20, xshift=0, yshift=0, ptype='mesh',frac=False):
     
     rho     = np.arange(0,4,4.0/data.shape[1]);
-    Theta   = np.deg2rad(range(data.shape[0]))
+    Theta   = np.deg2rad(range(90, data.shape[0] + 90))
     [th, r] = np.meshgrid(Theta, rho);
 
     fig, ax = plt.subplots(figsize=(6,6))
@@ -573,8 +593,6 @@ def draw_circle_frac(ax, mu, width=4, fs=20, color='white'):
     
 def draw_circle(ax, mu, width=4, fs=15, xshift=0, yshift=0, color='white'):
     
-    
-    
     circle1 = plt.Circle((0,0), 1, color='black', fill=False, linewidth=width)
     circle2 = plt.Circle((0,0), 2, color='black', fill=False, linewidth=width)
     circle3 = plt.Circle((0,0), 3, color='black', fill=False, linewidth=width)
@@ -595,9 +613,9 @@ def draw_circle(ax, mu, width=4, fs=15, xshift=0, yshift=0, color='white'):
         ax.add_line(l)
         
         xi, yi = polar2cart(3.5, theta_i + 2*np.pi/12)
-        ax.text(xi-.4-xshift, yi-yshift, '%d' %(mu[j]), weight='bold', fontsize=fs, color=color);
+        ax.text(xi-.4-xshift, yi-yshift, '%.1f' %(mu[j]), weight='bold', fontsize=fs, color=color);
         xi, yi = polar2cart(2.5, theta_i + 2*np.pi/12)
-        ax.text(xi-.4-xshift, yi-yshift, '%d' %(mu[j+6]), weight='bold', fontsize=fs, color=color); j += 1
+        ax.text(xi-.4-xshift, yi-yshift, '%.1f' %(mu[j+6]), weight='bold', fontsize=fs, color=color); j += 1
         
     j += 6
     LABELS = ['ANT', 'SEPT', 'INF', 'LAT']
@@ -610,7 +628,7 @@ def draw_circle(ax, mu, width=4, fs=15, xshift=0, yshift=0, color='white'):
         
         xi, yi = polar2cart(1.5, theta_i + 2*np.pi/8)
 
-        ax.text(xi-.4-xshift, yi-yshift, '%d' %(mu[j]), weight='bold', fontsize=fs, color=color); j += 1;
+        ax.text(xi-.4-xshift, yi-yshift, '%.1f' %(mu[j]), weight='bold', fontsize=fs, color=color); j += 1;
         xi, yi = polar2cart(5, theta_i + 2*np.pi/8)
 
     ax.text(-.4-xshift, 0-yshift, '%d' %(mu[j]), weight='bold', fontsize=fs, color=color)
