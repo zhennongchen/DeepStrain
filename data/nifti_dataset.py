@@ -9,31 +9,31 @@ import numpy as np
 import nibabel as nib
 
 from dipy.align.reslice import reslice
-from data.base_dataset import BaseDataset, Transforms
+# from data.base_dataset import BaseDataset, Transforms
 from data.image_folder import make_dataset
 
 
-class NiftiDataset(BaseDataset):
+# class NiftiDataset(BaseDataset):
 
-    def __init__(self, opt):
-        BaseDataset.__init__(self, opt)
-        self.filenames = sorted(make_dataset(opt.dataroot, opt.max_dataset_size, opt.dataformat))
-        self.transform = Transforms(opt)
+#     def __init__(self, opt):
+#         BaseDataset.__init__(self, opt)
+#         self.filenames = sorted(make_dataset(opt.dataroot, opt.max_dataset_size, opt.dataformat))
+#         self.transform = Transforms(opt)
     
-    def __len__(self):
-        return len(self.filenames)
+#     def __len__(self):
+#         return len(self.filenames)
                 
-    def __getitem__(self, idx):      
-        nifti           = nib.load(self.filenames[idx])
-        nifti_resampled = resample_nifti(nifti, 
-                                         order=self.opt.order,
-                                         mode=self.opt.mode,
-                                         in_plane_resolution_mm=self.opt.in_plane_resolution_mm,
-                                         slice_thickness_mm=self.opt.slice_thickness_mm,
-                                         number_of_slices=self.opt.number_of_slices)
+#     def __getitem__(self, idx):      
+#         nifti           = nib.load(self.filenames[idx])
+#         nifti_resampled = resample_nifti(nifti, 
+#                                          order=self.opt.order,
+#                                          mode=self.opt.mode,
+#                                          in_plane_resolution_mm=self.opt.in_plane_resolution_mm,
+#                                          slice_thickness_mm=self.opt.slice_thickness_mm,
+#                                          number_of_slices=self.opt.number_of_slices)
         
-        x = self.transform.apply(nifti_resampled.get_fdata())
-        return x, nifti, nifti_resampled
+#         x = self.transform.apply(nifti_resampled.get_fdata())
+#         return x, nifti, nifti_resampled
     
 
 def save_as_nifti(y, nifti, nifti_resampled, filename):

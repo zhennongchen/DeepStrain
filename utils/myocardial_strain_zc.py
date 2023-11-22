@@ -162,8 +162,7 @@ class Rotate_data():
             Ecc   = rotate(Ecc,  -angle + 30, reshape=False, order=0)
             Err   = rotate(Err,  -angle + 30, reshape=False, order=0)
             mask  = rotate(mask, -angle + 30, reshape=False, order=1).clip(0,3).round()
-            
-
+        
         
         # roll to center o
         cx, cy = center_of_mass(mask>1)[:2]
@@ -207,14 +206,21 @@ class PolarMap():
 
         for rj in range(nz):
 
-            Err_q  = _inpter2(E[rj]) # increase size by 10
+            m = np.copy(self.mask[:,:,rj])
+            cx, cy = center_of_mass(m==2)
+
+            E_rj = E[rj]
+            E_rj = roll_to_center(E_rj, cx, cy) # center the image
+            Err_q  = _inpter2(E_rj) # increase size by 10
+
+            # Err_q  = _inpter2(E[rj]) # increase size by 10
 
             PHI, R = _polar_grid(*Err_q.shape) # *Err_q.shape as well as PHI and R = (1280, 1280)
             PHI = PHI.ravel() # flatten
             R   = R.ravel()
 
             for k, pmin in enumerate(angles):
-                pmax = pmin + dphi/2.0 # 0.5 increment
+                pmax = pmin + 3  # large increment to include more points in myocardium # previous dphi/2.0 # 0.5 increment
 
                 # Get values for angle segment
                 PHI_SEGMENT = (PHI>=pmin)&(PHI<=pmax)
@@ -226,7 +232,7 @@ class PolarMap():
                 Rk = Rk[np.abs(Vk)!=0]
                 Vk = Vk[np.abs(Vk)!=0]
                 
-                if len(Vk) == 0:
+                if len(Vk) == 0 or len(Vk) == 1:
                     continue # this might not be the best
                 Rk = _rescale_linear(Rk, rj, rj + 1)  #scale Rk into 0 to 1
 
@@ -258,15 +264,19 @@ class PolarMap():
 
         # divide into apical, mid and basal layers
         slices_per_layer = E.shape[0]//3
+        mod = E.shape[0] % 3
+        if mod == 1 or mod == 2:
+            mod = 1
+
         if start_slice_name == 'apex':
             layer1 = E[0:slices_per_layer,...]
-            layer2 = E[slices_per_layer : slices_per_layer * 2 + 1,...]
-            layer3 = E[slices_per_layer * 2 + 1: E.shape[0],...]
+            layer2 = E[slices_per_layer : slices_per_layer * 2 + mod,...]
+            layer3 = E[slices_per_layer * 2 + mod: E.shape[0],...]
         
         else: # start from "base"
             layer1 = E[E.shape[0] - slices_per_layer :E.shape[0],...]
-            layer2 = E[E.shape[0] - slices_per_layer * 2 -1 : E.shape[0] - slices_per_layer,...]
-            layer3 = E[0: E.shape[0] - slices_per_layer * 2 -1,...]
+            layer2 = E[E.shape[0] - slices_per_layer * 2 - mod : E.shape[0] - slices_per_layer,...]
+            layer3 = E[0: E.shape[0] - slices_per_layer * 2 -mod,...]
 
         E = [layer1, layer2, layer3]  ######### apical, mid, basal
 
@@ -332,6 +342,158 @@ class PolarMap():
         c = c4 + c3 + c2 + c1
 
         return c
+    
+
+class wall_thickness_change_index():
+   def __init__(self, mask_rot, mask_rot_es):       
+      self.mask_tf1  = mask_rot
+      self.mask_tf2  = mask_rot_es
+
+   def calculate_index(self):
+      # prepare data
+      E = np.copy(self.mask_tf1)
+      E_es = np.copy(self.mask_tf2)
+
+      # get len change
+      len_change_tf1 = self.calculate_len_change(E)
+      len_change_tf2 = self.calculate_len_change(E_es)
+
+      wtci = np.zeros(len_change_tf1.shape)
+      for i in range(len_change_tf1.shape[0]):
+         for j in range(len_change_tf1.shape[1]):
+           if len_change_tf1[i,j,0] != 0:
+            wtci[i,j] += (len_change_tf2[i,j,0] - len_change_tf1[i,j,0])/len_change_tf1[i,j,0]
+         
+      return wtci
+
+      
+   def calculate_len_change(self, E):
+      '''E should be equal to np.copy(self.mask_tf)'''
+      # prepare data
+      E = E.transpose((2,0,1))
+
+      # prepare angles and radians
+      nz = E.shape[0]
+      angles = np.arange(0, 360, 1)
+      len_change = np.zeros((nz, angles.shape[0], 100))
+
+      for rj in range(nz):
+         # find the center of mass
+         m = np.copy(self.mask_tf1[:,:,rj])
+         cx, cy = center_of_mass(m>=2)  
+
+         # find the slice
+         E_rj = E[rj]
+         E_rj = roll_to_center(E_rj, cx, cy)
+
+         Err_q  = _inpter2(E_rj)
+         Err_q[abs(Err_q - 2) < 0.3] = 2 # stablize
+
+         PHI, _ = _polar_grid(*Err_q.shape) # *Err_q.shape as well as PHI and R = (1280, 1280)
+         PHI = PHI.ravel() # flatten
+
+         for k, pmin in enumerate(angles):
+            pmax = pmin + 3 # 3 for stablization
+            PHI_SEGMENT = (PHI>=pmin)&(PHI<=pmax)
+            PHI_SEGMENT = np.reshape(PHI_SEGMENT, (1280, 1280))
+
+            points = np.where(PHI_SEGMENT==True)
+
+            # let's find out several boundary points
+            # first, in "points", which point is the cloest to the [cx, cy]
+            dis = np.sqrt((points[0]-cx * 10)**2 + (points[1]-cy * 10)**2)
+            dis_index = np.argsort(dis)
+            innest_point = points[0][dis_index[0]], points[1][dis_index[0]]
+
+            # second, let's find out which points in "points" have value equal to 2 in Err_q
+            points_value = Err_q[points[0], points[1]]
+            points_value_index = np.where(points_value==2)
+            points_value_index = points_value_index[0]
+            points_w_2 = points[0][points_value_index], points[1][points_value_index]
+
+            # third, find out in points_w_2, which point is the cloest to the innest_point
+            dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
+            dis_index = np.argsort(dis)
+            start_point = points_w_2[0][dis_index[0]], points_w_2[1][dis_index[0]]
+
+            # fourth, find out in points_w_2, which point is further to the innest_point
+            dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
+            dis_index = np.argsort(dis)
+            end_point = points_w_2[0][dis_index[-1]], points_w_2[1][dis_index[-1]]
+
+            # fifth, calculat the euclidean distance between start_point and end_point
+            dis = np.sqrt((start_point[0]-end_point[0])**2 + (start_point[1]-end_point[1])**2)
+
+            # plot if needed
+            # plt.figure(figsize=(8,4))
+            # plt.subplot(121); plt.imshow(Err_q, cmap='gray')
+            # PHI = np.reshape(PHI, (1280, 1280))
+            # Err_q[innest_point[0] :innest_point[0] + 5 , innest_point[1] : innest_point[1] +5] = 5
+            # Err_q[start_point[0] :start_point[0] + 5 , start_point[1] : start_point[1] +5] = 5
+            # Err_q[end_point[0] :end_point[0] + 5 , end_point[1] : end_point[1] +5] = 5
+            # plt.subplot(122); plt.imshow(Err_q , cmap='gray')
+
+            len_change[rj,k] += dis
+
+      return len_change 
+   
+   def construct_AHA_map(self, tensor, start_slice_name, sigma = 12):
+
+        E  = tensor.copy()
+        mu = E[:,:,:].mean()
+
+        nz = E.shape[0]
+        E  = np.concatenate(np.array_split(E[:,:,:], nz), axis=-1)[0] # stack the slices together,  shape (360, (stop - start) * slice_num)
+
+        old = E.shape[1]/nz*1. # original R (stop - start)
+        for j in range(nz-1):
+            xi = int(old//2+j*old)
+            xj = int(old+old//2+j*old)
+            E[:,xi:xj] = gaussian_filter(E[:,xi:xj],sigma=sigma, mode='wrap')
+            E[:,xi:xj] = gaussian_filter(E[:,xi:xj],sigma=sigma, mode='wrap')
+
+        E = np.stack(np.array_split(E,nz,axis=1)) # put into original shape
+
+        # divide into apical, mid and basal layers
+        slices_per_layer = E.shape[0]//3
+        mod = E.shape[0] % 3
+        if mod == 1 or mod == 2:
+            mod = 1
+
+        if start_slice_name == 'apex':
+            layer1 = E[0:slices_per_layer,...]
+            layer2 = E[slices_per_layer : slices_per_layer * 2 + mod,...]
+            layer3 = E[slices_per_layer * 2 + mod: E.shape[0],...]
+        
+        else: # start from "base"
+            layer1 = E[E.shape[0] - slices_per_layer :E.shape[0],...]
+            layer2 = E[E.shape[0] - slices_per_layer * 2 -mod : E.shape[0] - slices_per_layer,...]
+            layer3 = E[0: E.shape[0] - slices_per_layer * 2 -mod,...]
+
+        E = [layer1, layer2, layer3]  ######### apical, mid, basal
+        # print('layer1, layer2, layer3: ', layer1.shape, layer2.shape, layer3.shape)
+
+        E = [np.mean(E[i], axis=0) for i in range(3)] # calculate mean across all slices in each layer
+        # print('E: ', E[0].shape, E[1].shape, E[2].shape)
+        E = np.concatenate(E, axis=1)  # shape (360, 3 * (stop - start))
+
+        mu = [mu] + self._get_16segments(E) +[0]
+
+        return E, mu 
+    
+   def _get_16segments(self, data):
+        c2,c3,c4 = np.array_split(data,3,axis=-1)
+
+        c4 = [np.mean(ci) for ci in np.array_split(c4,6,axis=0)]  # basal
+     
+        c3 = [np.mean(ci) for ci in np.array_split(c3,6,axis=0)]  # mid
+
+        c2 = [np.mean(ci) for ci in np.array_split(c2,4,axis=0)]  # apical
+
+        c = c4 + c3 + c2 
+        return c
+   
+
     
 def _roll(x, rx, ry):
     x = np.roll(x, rx, axis=0)

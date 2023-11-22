@@ -50,7 +50,7 @@ for i in range(0, spreadsheet.shape[0]):
     print(patient_id)
 
     # save folder
-    strain_save_folder = os.path.join(cg.deep_dir, 'results/trained/strain', patient_id)
+    strain_save_folder = os.path.join(cg.deep_dir, 'results/trained/mvf', patient_id)
     ff.make_folder([strain_save_folder])
 
     if os.path.isfile(os.path.join(strain_save_folder, 'mvf_ED_ES.nii.gz')):
