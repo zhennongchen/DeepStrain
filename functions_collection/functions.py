@@ -185,54 +185,6 @@ def count_pixel(seg,target_val):
         pixels.append(p)
     return count,pixels
 
-# function: optimize the prediction
-def optimize(pred, true, mode = [0,1,2]):
-    true = np.reshape(true, -1)
-    assert pred.shape[1] == true.shape[0]
-
-    final_answer_list = []
-
-    # average
-    final_answer_average = np.zeros(pred.shape[1])
-    for j in range(0,pred.shape[1]):
-        col = pred[:,j]
-        col_rank = np.sort(col)
-        final_answer_average[j] = np.mean(col_rank)
-    
-    if 0 in mode:
-        final_answer_list.append(final_answer_average)
-
-    # pick best model (w/lowest MAE)
-    errors = np.mean(np.abs(pred - true), axis=1)
-    min_index = np.argmin(errors)
-    final_answer_model_mae = pred[min_index]
-    if 1 in mode:
-        final_answer_list.append(final_answer_model_mae)
-    
-    # pick best model (w/lowest largest difference)
-    errors = np.max(np.abs(pred - true), axis=1)
-    min_index = np.argmin(errors)
-    final_answer_model_diff = pred[min_index]
-    if 2 in mode:
-        return final_answer_model_diff
-        # final_answer_list.append(final_answer_model_diff)
-
-    # pick element-wise
-    mae = np.abs(pred - true)
-    # Find the index of the element with the smallest MAE in each column
-    index = np.argmin(mae, axis=0)
-    
-    # Select the corresponding elements from each column of "pred"
-    final_answer_model_element = pred[index, np.arange(pred.shape[1])]
-    if 3 in mode:
-        return final_answer_model_element
-    
-    final_answer_list = np.reshape(np.asarray(final_answer_list), (-1, pred.shape[1]))
-    errors = np.mean(np.abs(final_answer_list - true), axis=1)
-    min_index = np.argmin(errors)
-   
-    return final_answer_list[min_index]
-
 
 # Dice calculation
 def np_categorical_dice(pred, truth, k):
@@ -363,23 +315,6 @@ def XX_to_ID_00XX(num):
     elif num >= 1000:
         return 'ID_' + str(num)
 
-# function: make movies
-# def make_movies(save_path,pngs,fps):
-#     mpr_array=[]
-#     i = cv2.imread(pngs[0])
-#     h,w,l = i.shape
-
-#     for j in pngs:
-#         img = cv2.imread(j)
-#         mpr_array.append(img)
-
-
-#     # save movies
-#     out = cv2.VideoWriter(save_path,cv2.VideoWriter_fourcc(*'mp4v'),fps,(w,h))
-#     for j in range(len(mpr_array)):
-#         out.write(mpr_array[j])
-#     out.release()
-
 
 # function: remove scattered regions in a binary image
 def remove_scatter(img,target_label):
@@ -408,4 +343,3 @@ def remove_scatter(img,target_label):
         new_slice[new_slice == 100] = 0
         new_img[:,:,i] = new_slice
     return new_img
-    

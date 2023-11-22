@@ -126,9 +126,14 @@ for patient_index in range(0, patient_list.shape[0]):
     # find the nonzero slices in the strain.mask
     slice_nonzero_ed = [i for i in range(strain.mask.shape[2]) if np.sum(strain.mask[:,:,i] > 1)>0]
     slice_nonzero_es = [i for i in range(strain_es.mask.shape[2]) if np.sum(strain_es.mask[:,:,i] > 1)>0]
-    slice_effective = slice_nonzero_es
+    # find the effective slices, which is the intersection of nonzero slices in ED and ES. please write the code here
+    slice_effective = []
+    for i in slice_nonzero_ed:
+        if i in slice_nonzero_es:
+            slice_effective.append(i)
     print(strain.mask.shape, slice_nonzero_ed)
-    print(strain_es.mask.shape, slice_effective)
+    print(strain_es.mask.shape, slice_nonzero_es)
+    print('slice Effective: ', slice_effective)
 
     # find out it starts from apex or base
     start_slice = np.copy(strain.mask[:,:,slice_nonzero_ed[1]]); start_slice[start_slice >0] = 1
@@ -242,7 +247,7 @@ for patient_index in range(0, patient_list.shape[0]):
 
     ######## # collect all the parameters and save into numpy
     raw_strain = [strain]
-    slice_info = [slice_nonzero_ed, slice_effective, start_slice_name, base_layer, mid_layer, apex_layer]
+    slice_info = [slice_effective , slice_nonzero_ed, slice_nonzero_es, start_slice_name, base_layer, mid_layer, apex_layer]
     global_strain =   [global_radial_strain, global_circumferential_strain]
     layer_strain = [  layer_radial_strain, layer_circumferential_strain]
     rotated_mask = [ mask_rot, mask_rot_es,  mask_rot_vis]
