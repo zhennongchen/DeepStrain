@@ -210,6 +210,21 @@ def HD(pred,gt, pixel_size, min ):
     else:
         return np.min(np.array([hd1, hd2]))
 
+# function: accuracy, sensitivity, specificity:
+def quantitative(y_pred, y_true):
+    accuracy = np.sum(y_pred == y_true) / len(y_true)
+
+    # also calculate sensitivity and specificity, write the code please
+    TP = np.sum((y_true == 1) & (y_pred == 1))
+    TN = np.sum((y_true == 0) & (y_pred == 0))
+    FP = np.sum((y_true == 0) & (y_pred == 1))
+    FN = np.sum((y_true == 1) & (y_pred == 0))
+    # Sensitivity (True Positive Rate)
+    sensitivity = TP / (TP + FN) if (TP + FN) > 0 else 0.0
+    # Specificity (True Negative Rate)
+    specificity = TN / (TN + FP) if (TN + FP) > 0 else 0.0
+    return accuracy, sensitivity, specificity, TP, TN, FP, FN
+
 # function: pick slices:
 def pick_slices(all_slices, heart_slices, target_num):
     a = np.asarray(all_slices)
@@ -343,3 +358,36 @@ def remove_scatter(img,target_label):
         new_slice[new_slice == 100] = 0
         new_img[:,:,i] = new_slice
     return new_img
+
+# function: split train and val data
+def split_train_val(X,Y, cross_val_batch_num, val_batch_index, save_split_file = None):
+    '''X and Y first dimension is the number of cases'''
+    num_of_cases_in_each_batch = int(X.shape[0] / cross_val_batch_num)
+
+    if os.path.isfile(save_split_file):
+        batches = np.load(save_split_file)
+    
+    else:
+        # find out which Y is 1 and which Y is 0
+        Y_1_index = np.where(Y == 1)[0]
+        Y_0_index = np.where(Y == 0)[0]
+        # split these indexes into 10 groups with similar size
+        Y_1_index_split = np.array_split(Y_1_index,cross_val_batch_num)
+
+        batches = []; start = 0
+        for b in range(0, cross_val_batch_num):
+            current_num = Y_1_index_split[b].shape[0]
+            end = start + (num_of_cases_in_each_batch - current_num)
+            Y_0_batch = Y_0_index[start:end]
+  
+            batch = np.concatenate((Y_0_batch, Y_1_index_split[b]))
+            batches.append(batch)
+            start = end
+        batches = np.asarray(batches); np.save(save_split_file, batches)
+
+    # split the data into train and val, with the val batch index (Axis = 0) as validation dataset
+    val_idx = batches[val_batch_index,:]
+    train_idx = np.delete(batches, val_batch_index, 0).flatten()
+    X_train = X[train_idx,:]; Y_train = Y[train_idx]
+    X_val = X[val_idx,:]; Y_val =Y[val_idx]
+    return X_train, Y_train,  train_idx, X_val, Y_val, val_idx
