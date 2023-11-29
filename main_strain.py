@@ -102,9 +102,6 @@ for patient_index in range(0, patient_list.shape[0]):
     y_t = y_t[None,...]
     print('y_t shape: ', y_t.shape)
 
-    # smooth the motion fields. Note that these motion fields can be used to warp points individually, or could be 
-    # used to deform an endocardial contour. 
-    y_t = gaussian_filter(y_t, sigma=(0,2,2,0,0))
 
     # last: calculate strain 
     mask_end_diastole = M[..., 0]
