@@ -60,7 +60,7 @@ for i in range(0, spreadsheet.shape[0]):
     # define data folders
     patient_img_folder = os.path.join(cg.data_dir, 'nii_img', patient_id)
     patient_seg_folder = os.path.join(cg.data_dir, 'nii_manual_seg', patient_id)
-    patient_seg_folder_2 = os.path.join(cg.data_dir,'results/fine_tune_carson/seg/', patient_id)
+    patient_seg_folder_2 = os.path.join(cg.deep_dir,'results/fine_tune_carson/seg/', patient_id)
 
     # define ED and ES
     ED = spreadsheet['ED'].iloc[i].astype(int)
@@ -85,7 +85,7 @@ for i in range(0, spreadsheet.shape[0]):
         else:
             print('using predicted segmentation')
             M_nifti_ED = nb.load(os.path.join(patient_seg_folder_2, 'pred_seg_frame' + str(ED) + '.nii.gz'))
-            M_nifti_ES = nb.load(os.path.join(patient_seg_folder_2 ,patient_id,'pred_seg_frame' + str(ES) + '.nii.gz'))
+            M_nifti_ES = nb.load(os.path.join(patient_seg_folder_2 ,'pred_seg_frame' + str(ES) + '.nii.gz'))
 
         M_ED = np.round(M_nifti_ED.get_fdata()).astype(int)
         M_ED[M_ED==1] = 3
@@ -94,7 +94,6 @@ for i in range(0, spreadsheet.shape[0]):
         M_ES = np.round(M_nifti_ES.get_fdata()).astype(int)
         M_ES[M_ES==1] = 3
         M_nifti_ES = nb.Nifti1Image(M_ES, affine=M_nifti_ES.affine, header=M_nifti_ES.header)
-
 
         # prepare input
         V_nifti = nb.funcs.concat_images((V_nifti_ED, V_nifti_ES))
@@ -129,7 +128,7 @@ for i in range(0, spreadsheet.shape[0]):
 
         # save
         a = nb.Nifti1Image(y_t[0,:,:,:,:] , affine=V_nifti_ED.affine, header=V_nifti_ED.header)
-        filename =  'mvf_ED' + str(ED) + '_pair'+ str(tf) + '.nii.gz'
+        filename =  'mvf_ED' + str(ED) + '_tf'+ str(tf) + '.nii.gz'
         nb.save(a, os.path.join(strain_save_folder, filename))
 
         if tf == ES:

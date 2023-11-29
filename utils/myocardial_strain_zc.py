@@ -378,6 +378,7 @@ class wall_thickness_change_index():
       len_change = np.zeros((nz, angles.shape[0], 100))
 
       for rj in range(nz):
+     
          # find the center of mass
          m = np.copy(self.mask_tf1[:,:,rj])
          cx, cy = center_of_mass(m>=2)  
@@ -392,7 +393,9 @@ class wall_thickness_change_index():
          PHI, _ = _polar_grid(*Err_q.shape) # *Err_q.shape as well as PHI and R = (1280, 1280)
          PHI = PHI.ravel() # flatten
 
+         total_dis = 0
          for k, pmin in enumerate(angles):
+
             pmax = pmin + 3 # 3 for stablization
             PHI_SEGMENT = (PHI>=pmin)&(PHI<=pmax)
             PHI_SEGMENT = np.reshape(PHI_SEGMENT, (1280, 1280))
@@ -412,17 +415,22 @@ class wall_thickness_change_index():
             points_w_2 = points[0][points_value_index], points[1][points_value_index]
 
             # third, find out in points_w_2, which point is the cloest to the innest_point
-            dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
-            dis_index = np.argsort(dis)
-            start_point = points_w_2[0][dis_index[0]], points_w_2[1][dis_index[0]]
+            point_dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
+            if point_dis.shape[0] != 0:
+                dis_index = np.argsort(point_dis)
+                start_point = points_w_2[0][dis_index[0]], points_w_2[1][dis_index[0]]
 
-            # fourth, find out in points_w_2, which point is further to the innest_point
-            dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
-            dis_index = np.argsort(dis)
-            end_point = points_w_2[0][dis_index[-1]], points_w_2[1][dis_index[-1]]
+                # fourth, find out in points_w_2, which point is further to the innest_point
+                # dis = np.sqrt((points_w_2[0]-innest_point[0])**2 + (points_w_2[1]-innest_point[1])**2)
+                # dis_index = np.argsort(dis)
+                end_point = points_w_2[0][dis_index[-1]], points_w_2[1][dis_index[-1]]
 
-            # fifth, calculat the euclidean distance between start_point and end_point
-            dis = np.sqrt((start_point[0]-end_point[0])**2 + (start_point[1]-end_point[1])**2)
+                # fifth, calculat the euclidean distance between start_point and end_point
+                total_dis = np.sqrt((start_point[0]-end_point[0])**2 + (start_point[1]-end_point[1])**2)
+             
+            else:
+                total_dis = total_dis # use the previous angle
+
 
             # plot if needed
             # plt.figure(figsize=(8,4))
@@ -433,7 +441,7 @@ class wall_thickness_change_index():
             # Err_q[end_point[0] :end_point[0] + 5 , end_point[1] : end_point[1] +5] = 5
             # plt.subplot(122); plt.imshow(Err_q , cmap='gray')
 
-            len_change[rj,k] += dis
+            len_change[rj,k] += total_dis
 
       return len_change 
    
