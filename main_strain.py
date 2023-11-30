@@ -102,7 +102,6 @@ patient_list = spreadsheet.iloc[0:50]
 #     y_t = y_t[None,...]
 #     print('y_t shape: ', y_t.shape)
 
-
 #     # last: calculate strain 
 #     mask_end_diastole = M[..., 0]
 #     mask_end_systole = M[..., 1]
@@ -259,6 +258,8 @@ patient_list = spreadsheet.iloc[0:50]
 #     np.save(os.path.join(save_folder, 'rotated_mask.npy'), np.asarray(rotated_mask))
 #     np.save(os.path.join(save_folder, 'polar_strain.npy'), np.asarray(polar_strain))
 #     np.save(os.path.join(save_folder, 'wtci.npy'), np.asarray(wtci_collect))
+
+
 
 
 
