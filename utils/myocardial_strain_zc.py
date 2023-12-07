@@ -521,6 +521,9 @@ class Find_AHA_segment_centers():
 
             # find the center of mass and move to center
             cx, cy = center_of_mass(np.copy(E_slice)>=2)  
+            if np.isnan(cx) == 1:
+                continue
+            
             nx, ny = np.copy(E_slice).shape[:2]
             E_slice_centered = roll(np.copy(E_slice),  int(nx//2-cx), int(ny//2-cy))
 
