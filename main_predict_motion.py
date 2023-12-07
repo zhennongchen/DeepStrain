@@ -64,7 +64,7 @@ for i in range(0, spreadsheet.shape[0]):
 
     # define ED and ES
     ED = spreadsheet['ED'].iloc[i].astype(int)
-    ES = spreadsheet['ES'].iloc[i].astype(int)
+    ES = spreadsheet['ES_by_visual'].iloc[i].astype(int)
 
     for k in range(0,25):
         if ED + k == 25:

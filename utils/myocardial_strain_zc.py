@@ -371,7 +371,7 @@ class wall_thickness_change_index():
       '''E should be equal to np.copy(self.mask_tf)'''
       # prepare data
       E = E.transpose((2,0,1))
-
+ 
       # prepare angles and radians
       nz = E.shape[0]
       angles = np.arange(0, 360, 1)
@@ -501,6 +501,110 @@ class wall_thickness_change_index():
         c = c4 + c3 + c2 
         return c
    
+
+class Find_AHA_segment_centers():
+    def __init__(self, mask_rot):       
+        self.mask = mask_rot
+
+    def assign_different_values_for_each_aha(self):
+        E = np.copy(self.mask)
+        nz = E.shape[-1]
+        angles = np.arange(0, 360, 1)
+
+        angle_intervals = [[-30,30], [30,90], [90,150], [150,210], [210,270], [270,330]]
+        angle_intervals_apex = [[-45,45], [45,135],[135,225], [225,315]]
+
+        E_aha = np.zeros_like(E)
+
+        for rj in range(0, nz):
+            E_slice = np.copy(E[:,:, rj])
+
+            # find the center of mass and move to center
+            cx, cy = center_of_mass(np.copy(E_slice)>=2)  
+            nx, ny = np.copy(E_slice).shape[:2]
+            E_slice_centered = roll(np.copy(E_slice),  int(nx//2-cx), int(ny//2-cy))
+
+            E_slice_centered_aha = np.copy(E_slice_centered)
+
+            PHI, _ = _polar_grid(*E_slice_centered.shape) # *Err_q.shape as well as PHI and R = (128,128)
+            PHI = PHI.ravel() # flatten
+
+            if rj < 6: # base and mid
+                angle_intervals_now = angle_intervals
+            else: # apex
+                angle_intervals_now = angle_intervals_apex
+
+            # assign aha pixels
+            for k, angle_interval in enumerate(angle_intervals_now):
+        
+                p_min = angle_interval[0]
+                p_max = angle_interval[1]
+
+                if p_min == -30:
+                    PHI_SEGMENT = np.logical_or(np.logical_and(PHI >= 0, PHI <= 30), np.logical_and(PHI >= 330, PHI <= 360))
+            
+                elif p_min == -45:
+                    PHI_SEGMENT = np.logical_or(np.logical_and(PHI >= 0, PHI <= 45), np.logical_and(PHI >= 315, PHI <= 360))
+                else:
+                    PHI_SEGMENT = (PHI>=p_min)&(PHI<=p_max)
+
+                PHI_SEGMENT = np.reshape(PHI_SEGMENT, (128, 128))
+
+                points = np.where(PHI_SEGMENT==True)
+
+                for p in range(len(points[0])):
+                    if E_slice_centered_aha[points[0][p], points[1][p]] == 2:
+                        E_slice_centered_aha[points[0][p], points[1][p]] = k + 5  ####### different values!!!
+
+            # move back
+            E_slice_aha = roll(np.copy(E_slice_centered_aha),  -int(nx//2-cx), -int(ny//2-cy))
+            E_aha[:,:,rj] = E_slice_aha  
+
+        return E_aha
+    
+    def find_aha_segment_centers(self, E_aha):
+        # find the center of each AHA segmentation
+        region_list = ['base', 'mid', 'apex']
+        aha_center_list_int = np.zeros([16,3])
+        aha_center_list_decimals = np.zeros([16,3])
+
+        # let's do base first
+        for region in region_list:
+            if region[0:2] == 'ba': # base
+                slice_start = 0
+                slice_end = 3
+                aha_index = [1,2,3,4,5,6]
+            elif region[0:2] == 'mi': # mid
+                slice_start = 3
+                slice_end = 6
+                aha_index = [7,8,9,10,11,12]
+            elif region[0:2] == 'ap': # apex
+                slice_start = 6
+                slice_end = 9
+                aha_index = [13,14,15,16]
+            
+            for index in range(len(aha_index)):
+                E_aha_region = np.copy(E_aha[:,:, slice_start : slice_end])
+
+                E_aha_specific_segment = np.copy(E_aha_region) == (5 + index)
+                center_specific_segment = center_of_mass(E_aha_specific_segment)
+
+                aha_center_list_int[aha_index[index]-1, 0] = int(np.round(center_specific_segment[0]))
+                aha_center_list_int[aha_index[index]-1, 1] = int(np.round(center_specific_segment[1]))
+                aha_center_list_int[aha_index[index]-1, 2] = int(slice_start + np.round(center_specific_segment[2]))
+
+                aha_center_list_decimals[aha_index[index]-1, 0] = center_specific_segment[0]
+                aha_center_list_decimals[aha_index[index]-1, 1] = center_specific_segment[1]
+                aha_center_list_decimals[aha_index[index]-1, 2] = slice_start + center_specific_segment[2]
+
+
+
+        E_aha_w_centers = np.copy(E_aha)
+        for aha_center in aha_center_list_int:
+            E_aha_w_centers[int(aha_center[0]), int(aha_center[1]), int(aha_center[2])] = 12
+
+        return aha_center_list_int, aha_center_list_decimals, E_aha_w_centers
+
 
     
 def _roll(x, rx, ry):
