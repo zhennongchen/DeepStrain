@@ -28,6 +28,6 @@ export CG_REGULARIZER_COEFF=0.2
 export CG_SEED=8
 
 # folders for Zhennong's dataset (change based on your folder paths)
-export CG_DEEP_DIR="/mnt/mount_zc_NAS/Deepstrain/"
-export CG_DATA_DIR="/mnt/mount_zc_NAS/HFpEF/data/HFpEF_data/"
+export CG_DEEP_DIR="/mnt/camca_NAS/Deepstrain/"
+export CG_DATA_DIR="/mnt/camca_NAS/HFpEF/data/HFpEF_data/"
 
