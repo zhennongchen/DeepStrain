@@ -384,6 +384,7 @@ def split_train_val(X,Y, cross_val_batch_num, val_batch_index, save_split_file =
             batches.append(batch)
             start = end
         batches = np.asarray(batches); np.save(save_split_file, batches)
+        np.save(save_split_file, batches)
 
     # split the data into train and val, with the val batch index (Axis = 0) as validation dataset
     val_idx = batches[val_batch_index,:]
