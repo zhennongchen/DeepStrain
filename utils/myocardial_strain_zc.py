@@ -134,13 +134,14 @@ def convert_to_polar(mask, E):
 #     return Tensor, Mask
 
 class Rotate_data():
-    def __init__(self, Err, Ecc, mask, insertion_p1, insertion_p2, non_slice_num):
+    def __init__(self, Err, Ecc, mask,img, insertion_p1, insertion_p2):
         self.Err  = Err
         self.Ecc  = Ecc
         self.mask = mask
+        self.img  = img
         self.insertion_p1 = insertion_p1
         self.insertion_p2 = insertion_p2
-        self.non_slice_num = non_slice_num
+        # self.non_slice_num = non_slice_num
 
     def rotate_orientation(self , for_visualization = False):
         # goal: RV is at left of LV
@@ -149,19 +150,22 @@ class Rotate_data():
         Err  = self.Err.copy()
         Ecc  = self.Ecc.copy()
         mask = self.mask.copy()
+        img = self.img.copy()
 
         Err[mask!=2] = 0
         Ecc[mask!=2] = 0
 
         angle,_,_,_,_ = _get_lv2rv_angle_using_insertion_points(mask, self.insertion_p1, self.insertion_p2)
         if for_visualization:  # RVthe center of RV is 
-            Ecc   = rotate(Ecc,  -angle, reshape=False, order=0)
-            Err   = rotate(Err,  -angle, reshape=False, order=0)
-            mask  = rotate(mask, -angle, reshape=False, order=1).clip(0,3).round()  
+            Ecc   = rotate(Ecc,  -angle, reshape=False, order=1)
+            Err   = rotate(Err,  -angle, reshape=False, order=1)
+            mask  = rotate(mask, -angle, reshape=False, order=0).clip(0,3).round()  
+            img = rotate(img, -angle, reshape=False, order=2)
         else: # for calculation and AHA plot
-            Ecc   = rotate(Ecc,  -angle + 30, reshape=False, order=0)
-            Err   = rotate(Err,  -angle + 30, reshape=False, order=0)
-            mask  = rotate(mask, -angle + 30, reshape=False, order=1).clip(0,3).round()
+            Ecc   = rotate(Ecc,  -angle + 30, reshape=False, order=1)
+            Err   = rotate(Err,  -angle + 30, reshape=False, order=1)
+            mask  = rotate(mask, -angle + 30, reshape=False, order=0).clip(0,3).round()
+            img = rotate(img, -angle + 30, reshape=False, order=2)
         
         
         # roll to center o
@@ -169,13 +173,14 @@ class Rotate_data():
         Ecc_rot  = np.rot90(np.rot90(_roll_to_center(Ecc, cx, cy)))
         Err_rot  = np.rot90(np.rot90(_roll_to_center(Err, cx, cy)))
         mask_rot = np.rot90(np.rot90(_roll_to_center(mask, cx, cy))) 
+        img_rot = np.rot90(np.rot90(_roll_to_center(img, cx, cy)))
 
-        # remove slices that do not contain tissue labels
-        ID   = self.non_slice_num
-        mask_rot = mask_rot[:,:,ID]
-        Err_rot  = Err_rot[:,:,ID]
-        Ecc_rot  = Ecc_rot[:,:,ID]
-        return Err_rot, Ecc_rot, mask_rot, ID
+        # # remove slices that do not contain tissue labels
+        # ID   = self.non_slice_num
+        # mask_rot = mask_rot[:,:,ID]
+        # Err_rot  = Err_rot[:,:,ID]
+        # Ecc_rot  = Ecc_rot[:,:,ID]
+        return Err_rot, Ecc_rot, mask_rot, img_rot#, ID
 
     
 class PolarMap():
@@ -694,9 +699,9 @@ def write(ax, mu, j, width=2):
 def plot_bullseye(data,mu,vmin=None,vmax=None, savepath=None,cmap='RdBu_r', label='GPRS (%)', 
                   std=None,cbar=False,color='white', fs=20, xshift=0, yshift=0, ptype='mesh',frac=False):
     
-    rho     = np.arange(0,4,4.0/data.shape[1]);
+    rho     = np.arange(0,4,4.0/data.shape[1])
     Theta   = np.deg2rad(range(90, data.shape[0] + 90))
-    [th, r] = np.meshgrid(Theta, rho);
+    [th, r] = np.meshgrid(Theta, rho)
 
     fig, ax = plt.subplots(figsize=(6,6))
     #fig.subplots_adjust(left=0,right=1,bottom=0,top=1)
