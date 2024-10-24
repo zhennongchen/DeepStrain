@@ -253,12 +253,10 @@ class PolarMap():
     def construct_AHA_map(self, tensor, start_slice_name, start=20, stop=80, sigma=12):
 
         E  = tensor.copy()
-        print('line 1 E shape: ', E.shape)  
         mu = E[:,:,start:stop].mean()
 
         nz = E.shape[0]
         E  = np.concatenate(np.array_split(E[:,:,start:stop], nz), axis=-1)[0] # stack the slices together,  shape (360, (stop - start) * slice_num)
-        print('line 2 E shape: ', E.shape)
 
         old = E.shape[1]/nz*1. # original R (stop - start)
         for j in range(nz-1):
@@ -268,7 +266,6 @@ class PolarMap():
             E[:,xi:xj] = gaussian_filter(E[:,xi:xj],sigma=sigma, mode='wrap')
 
         E = np.stack(np.array_split(E,nz,axis=1)) # put into original shape
-        print('line 3 E shape: ', E.shape)
 
         # divide into apical, mid and basal layers
         slices_per_layer = E.shape[0]//3

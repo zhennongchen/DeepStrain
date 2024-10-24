@@ -27,7 +27,7 @@ patient_list = patient_list[patient_list['StudyDate']>20150219]
 print(patient_list.shape)
 
 save_folder = os.path.join(main_path, 'results/strain/')
-for i in range(0,patient_list.shape[0]):
+for i in range(110,136):
     patient_id_num = patient_list['OurID'].iloc[i]
     patient_id = ff.XX_to_ID_00XX(patient_id_num)
     print(i,patient_id)
@@ -51,7 +51,7 @@ for i in range(0,patient_list.shape[0]):
     sets = [set(lst) for lst in effective_slices_list]
     intersection = set.intersection(*sets)
     effective_slices = list(intersection)
-    print(effective_slices)
+    # print(effective_slices)
 
     # get the layer info
     slices_per_layer = len(effective_slices)//3
@@ -102,7 +102,7 @@ for i in range(0,patient_list.shape[0]):
 
         ## rotate the image
         if os.path.isfile(os.path.join(patient_save_folder, 'insertion_points.npy')):
-            print('use saved')
+            # print('use saved')
             insertion_points = np.load(os.path.join(patient_save_folder, 'insertion_points.npy'))
             insertion_p1 = insertion_points[0,:]
             insertion_p2 = insertion_points[1,:]
@@ -112,7 +112,7 @@ for i in range(0,patient_list.shape[0]):
         # get the rotation angle ready
         img_ed = nb.load(os.path.join(patient_img_folder, 'img_tf' + str(tf1) + '.nii.gz')).get_fdata()
         phi_angle   , cx_lv, cy_lv, cx_rv, cy_rv  = myocardial_strain_zc._get_lv2rv_angle_using_insertion_points(strain.mask, insertion_p1, insertion_p2)
-        print('insertion_p1, insertion_p2, phi_angle: ', insertion_p1, insertion_p2, phi_angle)
+        # print('insertion_p1, insertion_p2, phi_angle: ', insertion_p1, insertion_p2, phi_angle)
         rotate_f = myocardial_strain_zc.Rotate_data(strain.Err, strain.Ecc, strain.mask,img_ed, insertion_p1, insertion_p2 )
         Err_rot, Ecc_rot, mask_rot, img_rot= rotate_f.rotate_orientation(for_visualization=False)
         # only keep the effective slices
