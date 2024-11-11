@@ -30,14 +30,14 @@ save_folder = os.path.join(main_path, 'results/strain/')
 for i in range(patient_list.shape[0]):
     patient_id_num = patient_list['OurID'].iloc[i]
     patient_id = ff.XX_to_ID_00XX(patient_id_num)
-    if patient_id != 'ID_0002':
+    if patient_id != 'ID_0809':
         continue
     print(i,patient_id)
     patient_save_folder = os.path.join(save_folder, patient_id)
 
-    # if os.path.isfile(os.path.join(patient_save_folder, 'tf_14/strain_info.npy')):
-    #     print('already processed')
-    #     continue
+    if os.path.isfile(os.path.join(patient_save_folder, 'tf_14/strain_info.npy')):
+        print('already processed')
+        continue
 
     # define the effective slices
     effective_slices_list = []
@@ -136,5 +136,5 @@ for i in range(patient_list.shape[0]):
         slice_info = [effective_slices, 'base', base_layer, mid_layer, apex_layer]
 
         # save all above
-        np.save(os.path.join(patient_save_folder_timeframe,'strain_info1.npy'), strain_info,allow_pickle=True)
+        np.save(os.path.join(patient_save_folder_timeframe,'strain_info.npy'), strain_info,allow_pickle=True)
         np.save(os.path.join(patient_save_folder,'slice_info.npy'), slice_info)
